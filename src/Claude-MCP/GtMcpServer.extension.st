@@ -25,7 +25,10 @@ GtMcpServer >> handleRequest: request [
 		do: [ :anError | 
 			errors add: anError freeze.
 			self isDebug ifTrue: [ anError signal ].
-			^ ZnResponse badRequest: request ].
+			jsonRpcResult := { 
+				'content' -> { { 'type' -> 'text'. 'text' -> ('Error: ', anError class name, ' - ', anError messageText) } asDictionary } asArray. 
+				'isError' -> true 
+			} asDictionary ].
 	"JSON-RPC notifications have no id - return 202 Accepted with empty body"
 	jsonRpc id ifNil: [
 		| notificationResponse |
