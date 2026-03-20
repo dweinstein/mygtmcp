@@ -118,7 +118,37 @@ ClaudeMcpServer >> addAddSnippetTool [
 			'Added snippet: ', snippet uid asString ])
 ]
 
-{ #category : 'tool registration' }
+{ #category : 'tools' }
+ClaudeMcpServer >> addAddTableSnippetTool [
+	self addTool: (GtLlmFunctionTool new
+		name: 'addTableSnippet';
+		parameters: {'pageTitle'. 'columns'. 'rows'. 'height'};
+		description: 'Adds an inline table snippet (LeElementSnippet with GtPhlowColumnedListView) to a Lepiter page. columns is a JSON array of objects with "title", "key" (one of "first","second","third",... or "at1","at2",...), and optional "weight" (float, default 1). rows is a JSON array of arrays (each inner array is one row of cell values). height is optional pixel height (default "200"). Returns the new snippet UID.';
+		block: [ :functionCall |
+			| db page args colDefs rowData height code snippet |
+			args := functionCall arguments.
+			colDefs := STONJSON fromString: (args at: 'columns').
+			rowData := STONJSON fromString: (args at: 'rows').
+			height := (args at: 'height' ifAbsent: [ '200' ]) asInteger.
+
+			db := LeDatabasesRegistry default defaultLogicalDatabase.
+			page := db pageNamed: (args at: 'pageTitle') ifAbsent: [
+				| newPage |
+				newPage := LePage named: (args at: 'pageTitle').
+				db addPage: newPage.
+				newPage ].
+
+			code := self buildTableCode: colDefs rows: rowData.
+
+			snippet := LeElementSnippet new
+				code: code;
+				codeVisible: false;
+				elementHeight: height.
+			page addSnippet: snippet.
+			'Added table snippet: ' , snippet uid asString ])
+]
+
+{ #category : 'tools' }
 ClaudeMcpServer >> addAllTools [
 	self addGetImplementorsTool.
 	self addGetMethodSourceTool.
@@ -132,7 +162,8 @@ ClaudeMcpServer >> addAllTools [
 	self addReadSnippetTool.
 	self addUpdateSnippetTool.
 	self addAddSnippetTool.
-	self addGetReferencesTool
+	self addGetReferencesTool.
+	self addAddTableSnippetTool
 ]
 
 { #category : 'tools' }
@@ -441,6 +472,58 @@ ClaudeMcpServer >> addUpdateSnippetTool [
 { #category : 'accessing' }
 ClaudeMcpServer >> announcer [
 	^ announcer ifNil: [ announcer := Announcer new ]
+]
+
+{ #category : 'private' }
+ClaudeMcpServer >> buildTableCode: colDefs rows: rowData [
+	"Build the Smalltalk code string for a LeElementSnippet that renders a table.
+	colDefs is an array of dictionaries with 'title' and optional 'weight'.
+	rowData is an array of arrays (each inner array is one row).
+	Since we build the code string programmatically (not as a literal),
+	embedded strings use single quotes only. The snippet evaluates this code directly."
+
+	| stream q |
+	stream := String new writeStream.
+	q := ''''.
+	stream
+		nextPutAll: '| view |'; cr;
+		nextPutAll: 'view := GtPhlowColumnedListView new.'; cr;
+		nextPutAll: 'view items: [ {'; cr.
+
+	rowData doWithIndex: [ :row :rowIndex |
+		stream nextPutAll: '  { '.
+		row doWithIndex: [ :cell :cellIndex |
+			| escaped |
+			escaped := cell asString copyReplaceAll: q with: q, q.
+			stream
+				nextPut: $';
+				nextPutAll: escaped;
+				nextPut: $'.
+			cellIndex < row size ifTrue: [ stream nextPutAll: '. ' ] ].
+		stream nextPutAll: ' }'.
+		rowIndex < rowData size ifTrue: [ stream nextPut: $. ].
+		stream cr ].
+
+	stream nextPutAll: '} ].'; cr.
+
+	colDefs doWithIndex: [ :col :index |
+		| title weight escaped |
+		escaped := (col at: 'title') copyReplaceAll: q with: q, q.
+		weight := col at: 'weight' ifAbsent: [ nil ].
+		stream
+			nextPutAll: 'view column: ';
+			nextPut: $';
+			nextPutAll: escaped;
+			nextPut: $';
+			nextPutAll: ' text: [ :row | row at: ';
+			nextPutAll: index asString;
+			nextPutAll: ' ]'.
+		weight ifNotNil: [
+			stream nextPutAll: ' weight: '; nextPutAll: weight asString ].
+		stream nextPut: $.; cr ].
+
+	stream nextPutAll: 'view asElement'.
+	^ stream contents
 ]
 
 { #category : 'gt-actions' }
