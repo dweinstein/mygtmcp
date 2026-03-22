@@ -215,13 +215,13 @@ ClaudeMcpServer >> addEvaluateTool [
 	self addTool: (GtLlmFunctionTool new
 		name: 'evaluate';
 		parameters: {'expression'. 'maxLength'};
-		description: 'Evaluates a Smalltalk expression and returns the result as a string. Results are truncated to maxLength (default 2000 characters).';
+		description: 'Evaluates a Smalltalk expression and returns the result as a string. Results are truncated to maxLength (default 2000 characters). If the result is a visual element, it is exported as PNG and the file path is returned.';
 		block: [ :functionCall |
 			| args result max |
 			args := functionCall arguments.
 			max := (args at: 'maxLength' ifAbsent: [ maxLength ]) asNumber.
 			[ result := Smalltalk compiler evaluate: (args at: 'expression').
-			  self truncate: result printString to: max ]
+			  self renderAsContent: result max: max ]
 				on: Error
 				do: [ :e | 'Error: ', e class name, ' - ', e messageText ] ])
 ]
@@ -691,6 +691,18 @@ ClaudeMcpServer >> maxLength [
 { #category : 'accessing' }
 ClaudeMcpServer >> maxLength: aNumber [
 	maxLength := aNumber
+]
+
+{ #category : 'private' }
+ClaudeMcpServer >> renderAsContent: anObject max: max [
+	"I return a PNG path for visual elements, or truncated printString as fallback."
+	| element |
+	element := (anObject respondsTo: #asElement)
+		ifTrue: [ anObject asElement ]
+		ifFalse: [ anObject ].
+	(element respondsTo: #exportAsPNG)
+		ifTrue: [ ^ element exportAsPNG fullName ].
+	^ self truncate: anObject printString to: max
 ]
 
 { #category : 'private' }
