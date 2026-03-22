@@ -42,3 +42,44 @@ GtMcpServer >> handleRequest: request [
 	history add: request -> response.
 	^ response
 ]
+
+{ #category : '*Claude-MCP' }
+GtMcpServer >> handleToolsCall: aJsonRpc [
+	| tool result arguments |
+	tool := tools detect: [ :t | t name = (aJsonRpc params at: 'name') ].
+	arguments := aJsonRpc params at: 'arguments' ifAbsent: [ Dictionary new ].
+	result := tool performToolCall: (GtLlmFunctionToolCall new
+		name: (aJsonRpc params at: 'name');
+		arguments: arguments).
+	(result isArray and: [ result allSatisfy: #isDictionary ])
+		ifTrue: [ ^ { 'isError' -> false. 'content' -> result } asDictionary ].
+	^ { 'isError' -> false.
+		'content' -> {
+			{ 'type' -> 'text'. 'text' -> result asString } asDictionary
+		} } asDictionary
+]
+
+{ #category : '*Claude-MCP' }
+GtMcpServer >> handleToolsList: _ [
+	^ {'tools'
+			-> (tools
+					collect: [ :aTool |
+						| inputSchema |
+						inputSchema := (aTool respondsTo: #inputSchema)
+							ifTrue: [ aTool inputSchema ]
+							ifFalse: [
+								{'type' -> 'object'.
+									'properties'
+										-> (aTool parameters
+												collect: [ :aString |
+													aString
+														-> {'type' -> 'string'.
+															'description' -> aString} asDictionary ]) asDictionary.
+									'required' -> aTool parameters.
+									'additionalProperties' -> false} asDictionary ].
+						{'name' -> aTool name.
+							'title' -> aTool name.
+							'description' -> aTool description.
+							'inputSchema' -> inputSchema} asDictionary ]) asArray}
+		asDictionary
+]

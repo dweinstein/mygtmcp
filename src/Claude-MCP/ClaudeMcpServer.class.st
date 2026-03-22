@@ -65,8 +65,7 @@ Class {
 	#instVars : [
 		'server',
 		'maxLength',
-		'announcer',
-		'lastResult'
+		'announcer'
 	],
 	#classInstVars : [
 		'DefaultInstance'
@@ -75,9 +74,44 @@ Class {
 	#package : 'Claude-MCP'
 }
 
-{ #category : 'accessing' }
+{ #category : 'actions' }
+ClaudeMcpServer class >> cleanupDuplicateInstances [
+	| instances running keep |
+	instances := self allInstances.
+	running := instances select: [ :each | each isRunning ].
+	keep := running
+		ifNotEmpty: [ running first ]
+		ifEmpty: [ instances ifNotEmpty: [ instances first ] ifEmpty: [ nil ] ].
+	instances do: [ :each |
+		each == keep ifFalse: [
+			[ each stop ] on: Error do: [ ].
+			[ each releaseResources ] on: Error do: [ ] ] ].
+	DefaultInstance := keep.
+	Smalltalk garbageCollect.
+	^ keep
+]
+
+{ #category : 'instance creation' }
 ClaudeMcpServer class >> default [
-	^ DefaultInstance ifNil: [ DefaultInstance := self new ]
+	| running |
+	running := self allInstances
+		detect: [ :each | each isRunning ]
+		ifNone: [ nil ].
+	DefaultInstance ifNil: [
+		DefaultInstance := running ifNil: [ self new ] ].
+	(DefaultInstance isRunning not and: [ running notNil ]) ifTrue: [
+		DefaultInstance := running ].
+	^ DefaultInstance
+]
+
+{ #category : 'actions' }
+ClaudeMcpServer class >> reset [
+	"Stop and release all live ClaudeMcpServer instances, then clear the default instance."
+	self allInstances do: [ :each |
+		[ each stop ] on: Error do: [ ].
+		[ each releaseResources ] on: Error do: [ ] ].
+	DefaultInstance := nil.
+	Smalltalk garbageCollect
 ]
 
 { #category : 'accessing' }
@@ -89,10 +123,15 @@ ClaudeMcpServer class >> resetDefault [
 
 { #category : 'instance creation' }
 ClaudeMcpServer class >> startOnPort: aPort [
-	^ self new
+	| instance |
+	instance := self allInstances
+		detect: [ :each | each port = aPort ]
+		ifNone: [ self new ].
+	instance
 		port: aPort;
-		start;
-		yourself
+		start.
+	DefaultInstance := instance.
+	^ instance
 ]
 
 { #category : 'tools' }
@@ -151,21 +190,21 @@ ClaudeMcpServer >> addAddTableSnippetTool [
 
 { #category : 'tools' }
 ClaudeMcpServer >> addAllTools [
-	self addGetImplementorsTool.
-	self addGetMethodSourceTool.
-	self addDefineClassTool.
-	self addDefineMethodTool.
-	self addEvaluateTool.
-	self addInspectViewTool.
-	self addGetPackageInfoTool.
-	self addGetExamplesTool.
-	self addListPagesTool.
-	self addReadPageTool.
-	self addReadSnippetTool.
-	self addUpdateSnippetTool.
-	self addAddSnippetTool.
-	self addGetReferencesTool.
-	self addAddTableSnippetTool
+	self addSchemaToolClass: MyGtMcpGetImplementorsTool.
+	self addSchemaToolClass: MyGtMcpGetMethodSourceTool.
+	self addSchemaToolClass: MyGtMcpDefineClassTool.
+	self addSchemaToolClass: MyGtMcpDefineMethodTool.
+	self addSchemaToolClass: MyGtMcpDeleteClassTool.
+	self addSchemaToolClass: MyGtMcpEvaluateTool.
+	self addSchemaToolClass: MyGtMcpGetPackageInfoTool.
+	self addSchemaToolClass: MyGtMcpGetExamplesTool.
+	self addSchemaToolClass: MyGtMcpListPagesTool.
+	self addSchemaToolClass: MyGtMcpReadPageTool.
+	self addSchemaToolClass: MyGtMcpReadSnippetTool.
+	self addSchemaToolClass: MyGtMcpUpdateSnippetTool.
+	self addSchemaToolClass: MyGtMcpAddSnippetTool.
+	self addSchemaToolClass: MyGtMcpGetReferencesTool.
+	self addSchemaToolClass: MyGtMcpAddTableSnippetTool
 ]
 
 { #category : 'tools' }
@@ -216,42 +255,32 @@ ClaudeMcpServer >> addDefineMethodTool [
 ClaudeMcpServer >> addEvaluateTool [
 	self addTool: (GtLlmFunctionTool new
 		name: 'evaluate';
-		parameters: {'expression'. 'maxLength'};
-		description: 'Evaluates a Smalltalk expression and returns the result as a string. Results are truncated to maxLength (default 2000 characters). If the result is a visual element, it is exported as PNG and the file path is returned. Also returns available inspector views that can be explored with the inspectView tool.';
+		parameters: {'expression'. 'maxLength'. 'includeVisual'. 'imageSize'};
+		description: 'Evaluates a Smalltalk expression and returns the result. Results are truncated to maxLength (default 2000 characters). If includeVisual is true, also returns an inline PNG image of the evaluated object. Use imageSize (default 800) to control the maximum image dimension. Also returns available inspector views in the text response.';
 		block: [ :functionCall |
-			| args result max valueString viewSummary |
+			| args result max includeVisual imgSize content textResult viewSummary |
 			args := functionCall arguments.
 			max := (args at: 'maxLength' ifAbsent: [ maxLength ]) asNumber.
+			includeVisual := (args at: 'includeVisual' ifAbsent: [ 'false' ]) asString = 'true'.
+			imgSize := (args at: 'imageSize' ifAbsent: [ 800 ]) asNumber.
 			[ result := Smalltalk compiler evaluate: (args at: 'expression').
-			  lastResult := result.
-			  valueString := self renderAsContent: result max: max.
+			  textResult := self truncate: result printString to: max.
 			  viewSummary := self viewSummaryFor: result.
-			  valueString , String cr , '--- Views ---' , String cr , viewSummary ]
+			  content := OrderedCollection new.
+			  content add: {
+				  'type' -> 'text'.
+				  'text' -> (textResult, String cr, '--- Views ---', String cr, viewSummary)
+			  } asDictionary.
+			  includeVisual ifTrue: [
+				  [ content add: (self exportAsBase64PngContent: result maxImageSize: imgSize) ]
+					  on: Error
+					  do: [ :e | content add: {
+						  'type' -> 'text'.
+						  'text' -> ('(Image export failed: ', e messageText, ')')
+					  } asDictionary ] ].
+			  content asArray ]
 				on: Error
 				do: [ :e | 'Error: ', e class name, ' - ', e messageText ] ])
-]
-
-{ #category : 'tools' }
-ClaudeMcpServer >> addInspectViewTool [
-	self addTool: (GtLlmFunctionTool new
-		name: 'inspectView';
-		parameters: {'title'};
-		description: 'Inspects a specific view of the last evaluated result by title. Returns text content for text views, or a PNG image path for visual views. Use the evaluate tool first to see available views.';
-		block: [ :functionCall |
-			| title views match |
-			title := functionCall arguments at: 'title'.
-			lastResult
-				ifNil: [ 'Error: no result to inspect. Run evaluate first.' ]
-				ifNotNil: [
-					[ views := self viewsFor: lastResult.
-					  match := views
-						detect: [ :v | v title = title ]
-						ifNone: [ nil ].
-					  match
-						ifNil: [ 'Error: no view titled "' , title , '". Available: ' , (', ' join: (views collect: #title)) ]
-						ifNotNil: [ self renderAsContent: match max: maxLength ] ]
-							on: Error
-							do: [ :e | 'Error: ' , e class name , ' - ' , e messageText ] ] ])
 ]
 
 { #category : 'tools' }
@@ -464,12 +493,24 @@ ClaudeMcpServer >> addReadSnippetTool [
 ]
 
 { #category : 'tools' }
-ClaudeMcpServer >> addTool: aGtLlmFunctionTool [
-        "Wrap the tool's block so the result is always truncated before being returned."
-        | originalBlock |
-        originalBlock := aGtLlmFunctionTool block.
-        aGtLlmFunctionTool block: [ :call | self truncate: (originalBlock value: call) ].
-        server addTool: aGtLlmFunctionTool
+ClaudeMcpServer >> addSchemaToolClass: aToolClass [
+	server addTool: (aToolClass on: self)
+]
+
+{ #category : 'tools' }
+ClaudeMcpServer >> addTool: aTool [
+	(aTool isKindOf: GtLlmFunctionTool)
+		ifTrue: [
+			| originalBlock |
+			originalBlock := aTool block.
+			aTool block: [ :call |
+				| result |
+				result := originalBlock value: call.
+				(result isArray and: [ result allSatisfy: #isDictionary ])
+					ifTrue: [ self truncateContentItems: result ]
+					ifFalse: [ self truncate: result ] ].
+			server addTool: aTool ]
+		ifFalse: [ server addTool: aTool ]
 ]
 
 { #category : 'tools' }
@@ -500,6 +541,15 @@ ClaudeMcpServer >> addUpdateSnippetTool [
 { #category : 'accessing' }
 ClaudeMcpServer >> announcer [
 	^ announcer ifNil: [ announcer := Announcer new ]
+]
+
+{ #category : 'private' }
+ClaudeMcpServer >> asExportableElement: anObject [
+	"Convert anObject to a BlElement for PNG export."
+	(anObject isKindOf: BlElement) ifTrue: [ ^ anObject ].
+	(anObject isKindOf: Color) ifTrue: [
+		^ BlElement new background: anObject; size: 50@50 ].
+	^ anObject asElement
 ]
 
 { #category : 'private' }
@@ -552,6 +602,46 @@ ClaudeMcpServer >> buildTableCode: colDefs rows: rowData [
 
 	stream nextPutAll: 'view asElement'.
 	^ stream contents
+]
+
+{ #category : 'private' }
+ClaudeMcpServer >> ensureServer [
+	server ifNil: [
+		server := GtMcpServer new ].
+	server port: self port.
+	^ server
+]
+
+{ #category : 'private' }
+ClaudeMcpServer >> exportAsBase64PngContent: anObject maxImageSize: maxDim [
+	"Render anObject as an in-memory PNG and return an MCP image content dictionary."
+	| form stream base64 |
+	form := (anObject isKindOf: Form)
+		ifTrue: [
+			| f s |
+			f := anObject.
+			(f width > maxDim or: [ f height > maxDim ]) ifTrue: [
+				s := maxDim / (f width max: f height) asFloat.
+				f := f scaledToSize: (f extent * s) rounded ].
+			f ]
+		ifFalse: [
+			| element scaleFactor exporter |
+			element := self asExportableElement: anObject.
+			element forceLayout.
+			scaleFactor := (element width max: element height) > maxDim
+				ifTrue: [ maxDim / (element width max: element height) asFloat ]
+				ifFalse: [ 1.0 ].
+			exporter := BlFormExporter new element: element.
+			scaleFactor < 1.0 ifTrue: [ exporter scaled: scaleFactor ].
+			exporter export ].
+	stream := ByteArray new writeStream.
+	PNGReadWriter putForm: form onStream: stream.
+	base64 := ZnBase64Encoder new encode: stream contents.
+	^ {
+		'type' -> 'image'.
+		'data' -> base64.
+		'mimeType' -> 'image/png'
+	} asDictionary
 ]
 
 { #category : 'gt-actions' }
@@ -711,6 +801,13 @@ ClaudeMcpServer >> initialize [
 	server := GtMcpServer new port: 3030.
 ]
 
+{ #category : 'testing' }
+ClaudeMcpServer >> isRunning [
+	^ server notNil
+		and: [ (server instVarNamed: #server) notNil
+		and: [ (server instVarNamed: #server) isRunning ] ]
+]
+
 { #category : 'accessing' }
 ClaudeMcpServer >> maxLength [
 	^ maxLength
@@ -722,26 +819,114 @@ ClaudeMcpServer >> maxLength: aNumber [
 ]
 
 { #category : 'private' }
-ClaudeMcpServer >> renderAsContent: anObject max: max [
-	"I return text for text views, a PNG path for visual elements, or truncated printString as fallback."
-	| element |
-	(anObject isKindOf: GtPhlowTextEditorView)
-		ifTrue: [ ^ self truncate: anObject textBuilder value asString to: max ].
-	(anObject isKindOf: GtPhlowTextView)
-		ifTrue: [ ^ self truncate: anObject textBuilder value asString to: max ].
-	element := (anObject respondsTo: #asElement)
-		ifTrue: [ anObject asElement ]
-		ifFalse: [ anObject ].
-	(element respondsTo: #exportAsPNG)
-		ifTrue: [ ^ element exportAsPNG fullName ].
-	^ self truncate: anObject printString to: max
+ClaudeMcpServer >> parsedHistory [
+	"Parse history into a collection of dictionaries with keys: toolName, arguments, result, isError, request, response"
+	| history |
+	history := server instVarNamed: 'history'.
+	^ history collect: [ :assoc |
+		| reqJson respJson params toolName args result isError |
+		reqJson := [ NeoJSONReader fromString: assoc key entity contents ] on: Error do: [ :e | Dictionary new ].
+		respJson := [ NeoJSONReader fromString: assoc value entity contents ] on: Error do: [ :e | Dictionary new ].
+		params := reqJson at: 'params' ifAbsent: [ Dictionary new ].
+		toolName := params at: 'name' ifAbsent: [ reqJson at: 'method' ifAbsent: [ '?' ] ].
+		args := params at: 'arguments' ifAbsent: [ Dictionary new ].
+		result := respJson at: 'result' ifAbsent: [ Dictionary new ].
+		isError := (result isDictionary and: [ result at: 'isError' ifAbsent: [ false ] ]).
+		{ 
+			#toolName -> toolName.
+			#arguments -> args.
+			#result -> result.
+			#isError -> isError.
+			#request -> assoc key.
+			#response -> assoc value
+		} asDictionary ]
+]
+
+{ #category : 'accessing' }
+ClaudeMcpServer >> port [
+	^ server
+		ifNil: [ 3030 ]
+		ifNotNil: [ server port ]
+]
+
+{ #category : 'accessing' }
+ClaudeMcpServer >> port: aPort [
+	self ensureServer.
+	server port: aPort
 ]
 
 { #category : 'private' }
-ClaudeMcpServer >> viewsFor: anObject [
-	"I return the non-empty Phlow views for anObject."
-	^ (anObject gtViewsInContext: GtPhlowContext new)
-		reject: [ :v | v class = GtPhlowEmptyView ]
+ClaudeMcpServer >> releaseResources [
+	server ifNotNil: [
+		[ server tools removeAll ] on: Error do: [ ].
+		[ server clearHistory ] on: Error do: [ ].
+		[ server clearErrors ] on: Error do: [ ] ].
+	announcer := nil
+]
+
+{ #category : 'actions' }
+ClaudeMcpServer >> reset [
+	| currentPort oldServer |
+	currentPort := self port.
+	oldServer := server.
+	[ self stop ] on: Error do: [ ].
+	oldServer ifNotNil: [
+		[ oldServer tools removeAll ] on: Error do: [ ].
+		[ oldServer clearHistory ] on: Error do: [ ].
+		[ oldServer clearErrors ] on: Error do: [ ].
+		[ oldServer stop ] on: Error do: [ ] ].
+	server := nil.
+	announcer := nil.
+	maxLength ifNil: [ maxLength := 2000 ].
+	self ensureServer.
+	server port: currentPort.
+	self addAllTools.
+	^ self
+]
+
+{ #category : 'accessing' }
+ClaudeMcpServer >> server [
+	^ server
+]
+
+{ #category : 'actions' }
+ClaudeMcpServer >> start [
+	self ensureServer.
+	server tools removeAll.
+	self addAllTools.
+	server start.
+	self announcer announce: ClaudeMcpServerStarted new.
+	^ self
+]
+
+{ #category : 'actions' }
+ClaudeMcpServer >> stop [
+	server ifNotNil: [
+		server stop ].
+	self announcer announce: ClaudeMcpServerStopped new
+]
+
+{ #category : 'utilities' }
+ClaudeMcpServer >> truncate: aString [
+	^ self truncate: aString to: maxLength
+]
+
+{ #category : 'utilities' }
+ClaudeMcpServer >> truncate: aString to: max [
+	^ aString size > max
+		ifTrue: [ (aString first: max), '... (truncated, ', (aString size - max) asString, ' more chars)' ]
+		ifFalse: [ aString ]
+]
+
+{ #category : 'utilities' }
+ClaudeMcpServer >> truncateContentItems: contentArray [
+	"Truncate text content items, leave image items untouched."
+	^ contentArray collect: [ :item |
+		(item at: 'type') = 'text'
+			ifTrue: [
+				item at: 'text' put: (self truncate: (item at: 'text')).
+				item ]
+			ifFalse: [ item ] ]
 ]
 
 { #category : 'private' }
@@ -776,67 +961,8 @@ ClaudeMcpServer >> viewTypeHintFor: aView [
 ]
 
 { #category : 'private' }
-ClaudeMcpServer >> parsedHistory [
-	"Parse history into a collection of dictionaries with keys: toolName, arguments, result, isError, request, response"
-	| history |
-	history := server instVarNamed: 'history'.
-	^ history collect: [ :assoc |
-		| reqJson respJson params toolName args result isError |
-		reqJson := [ NeoJSONReader fromString: assoc key entity contents ] on: Error do: [ :e | Dictionary new ].
-		respJson := [ NeoJSONReader fromString: assoc value entity contents ] on: Error do: [ :e | Dictionary new ].
-		params := reqJson at: 'params' ifAbsent: [ Dictionary new ].
-		toolName := params at: 'name' ifAbsent: [ reqJson at: 'method' ifAbsent: [ '?' ] ].
-		args := params at: 'arguments' ifAbsent: [ Dictionary new ].
-		result := respJson at: 'result' ifAbsent: [ Dictionary new ].
-		isError := (result isDictionary and: [ result at: 'isError' ifAbsent: [ false ] ]).
-		{ 
-			#toolName -> toolName.
-			#arguments -> args.
-			#result -> result.
-			#isError -> isError.
-			#request -> assoc key.
-			#response -> assoc value
-		} asDictionary ]
-]
-
-{ #category : 'accessing' }
-ClaudeMcpServer >> port [
-	^ server port
-]
-
-{ #category : 'accessing' }
-ClaudeMcpServer >> port: aPort [
-	server port: aPort
-]
-
-{ #category : 'accessing' }
-ClaudeMcpServer >> server [
-	^ server
-]
-
-{ #category : 'controlling' }
-ClaudeMcpServer >> start [
-	server tools removeAll.
-	self addAllTools.
-	server start.
-	self announcer announce: ClaudeMcpServerStarted new.
-	^ self
-]
-
-{ #category : 'controlling' }
-ClaudeMcpServer >> stop [
-	server stop.
-	self announcer announce: ClaudeMcpServerStopped new
-]
-
-{ #category : 'utilities' }
-ClaudeMcpServer >> truncate: aString [
-	^ self truncate: aString to: maxLength
-]
-
-{ #category : 'utilities' }
-ClaudeMcpServer >> truncate: aString to: max [
-	^ aString size > max
-		ifTrue: [ (aString first: max), '... (truncated, ', (aString size - max) asString, ' more chars)' ]
-		ifFalse: [ aString ]
+ClaudeMcpServer >> viewsFor: anObject [
+	"I return the non-empty Phlow views for anObject."
+	^ (anObject gtViewsInContext: GtPhlowContext new)
+		reject: [ :v | v class = GtPhlowEmptyView ]
 ]
