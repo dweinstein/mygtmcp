@@ -65,7 +65,8 @@ Class {
 	#instVars : [
 		'server',
 		'maxLength',
-		'announcer'
+		'announcer',
+		'lastResult'
 	],
 	#classInstVars : [
 		'DefaultInstance'
@@ -155,6 +156,7 @@ ClaudeMcpServer >> addAllTools [
 	self addDefineClassTool.
 	self addDefineMethodTool.
 	self addEvaluateTool.
+	self addInspectViewTool.
 	self addGetPackageInfoTool.
 	self addGetExamplesTool.
 	self addListPagesTool.
@@ -215,15 +217,41 @@ ClaudeMcpServer >> addEvaluateTool [
 	self addTool: (GtLlmFunctionTool new
 		name: 'evaluate';
 		parameters: {'expression'. 'maxLength'};
-		description: 'Evaluates a Smalltalk expression and returns the result as a string. Results are truncated to maxLength (default 2000 characters). If the result is a visual element, it is exported as PNG and the file path is returned.';
+		description: 'Evaluates a Smalltalk expression and returns the result as a string. Results are truncated to maxLength (default 2000 characters). If the result is a visual element, it is exported as PNG and the file path is returned. Also returns available inspector views that can be explored with the inspectView tool.';
 		block: [ :functionCall |
-			| args result max |
+			| args result max valueString viewSummary |
 			args := functionCall arguments.
 			max := (args at: 'maxLength' ifAbsent: [ maxLength ]) asNumber.
 			[ result := Smalltalk compiler evaluate: (args at: 'expression').
-			  self renderAsContent: result max: max ]
+			  lastResult := result.
+			  valueString := self renderAsContent: result max: max.
+			  viewSummary := self viewSummaryFor: result.
+			  valueString , String cr , '--- Views ---' , String cr , viewSummary ]
 				on: Error
 				do: [ :e | 'Error: ', e class name, ' - ', e messageText ] ])
+]
+
+{ #category : 'tools' }
+ClaudeMcpServer >> addInspectViewTool [
+	self addTool: (GtLlmFunctionTool new
+		name: 'inspectView';
+		parameters: {'title'};
+		description: 'Inspects a specific view of the last evaluated result by title. Returns text content for text views, or a PNG image path for visual views. Use the evaluate tool first to see available views.';
+		block: [ :functionCall |
+			| title views match |
+			title := functionCall arguments at: 'title'.
+			lastResult
+				ifNil: [ 'Error: no result to inspect. Run evaluate first.' ]
+				ifNotNil: [
+					[ views := self viewsFor: lastResult.
+					  match := views
+						detect: [ :v | v title = title ]
+						ifNone: [ nil ].
+					  match
+						ifNil: [ 'Error: no view titled "' , title , '". Available: ' , (', ' join: (views collect: #title)) ]
+						ifNotNil: [ self renderAsContent: match max: maxLength ] ]
+							on: Error
+							do: [ :e | 'Error: ' , e class name , ' - ' , e messageText ] ] ])
 ]
 
 { #category : 'tools' }
@@ -695,14 +723,56 @@ ClaudeMcpServer >> maxLength: aNumber [
 
 { #category : 'private' }
 ClaudeMcpServer >> renderAsContent: anObject max: max [
-	"I return a PNG path for visual elements, or truncated printString as fallback."
+	"I return text for text views, a PNG path for visual elements, or truncated printString as fallback."
 	| element |
+	(anObject isKindOf: GtPhlowTextEditorView)
+		ifTrue: [ ^ self truncate: anObject textBuilder value asString to: max ].
+	(anObject isKindOf: GtPhlowTextView)
+		ifTrue: [ ^ self truncate: anObject textBuilder value asString to: max ].
 	element := (anObject respondsTo: #asElement)
 		ifTrue: [ anObject asElement ]
 		ifFalse: [ anObject ].
 	(element respondsTo: #exportAsPNG)
 		ifTrue: [ ^ element exportAsPNG fullName ].
 	^ self truncate: anObject printString to: max
+]
+
+{ #category : 'private' }
+ClaudeMcpServer >> viewsFor: anObject [
+	"I return the non-empty Phlow views for anObject."
+	^ (anObject gtViewsInContext: GtPhlowContext new)
+		reject: [ :v | v class = GtPhlowEmptyView ]
+]
+
+{ #category : 'private' }
+ClaudeMcpServer >> viewSummaryFor: anObject [
+	"I return a one-line summary of available views: 'Print (text), Integer (columned list), Meta'."
+	| views |
+	views := self viewsFor: anObject.
+	^ ', ' join: (views collect: [ :v |
+		| hint |
+		hint := self viewTypeHintFor: v.
+		hint isEmpty
+			ifTrue: [ v title ]
+			ifFalse: [ v title , ' (' , hint , ')' ] ])
+]
+
+{ #category : 'private' }
+ClaudeMcpServer >> viewTypeHintFor: aView [
+	"I return a short type hint string for the view, or empty if no specific hint applies."
+	| map |
+	map := {
+		GtPhlowTextEditorView -> 'text'.
+		GtPhlowTextView -> 'text'.
+		GtPhlowColumnedListView -> 'columned list'.
+		GtPhlowColumnedTreeView -> 'columned tree'.
+		GtPhlowListView -> 'list'.
+		GtPhlowTreeView -> 'tree'.
+		GtPhlowMondrianView -> 'mondrian'.
+		GtPhlowTableView -> 'table'.
+		GtPhlowDiffView -> 'diff'.
+	} asDictionary.
+	^ map at: aView class ifAbsent: [ '' ]
 ]
 
 { #category : 'private' }
