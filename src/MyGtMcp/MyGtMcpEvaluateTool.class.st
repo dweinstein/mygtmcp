@@ -141,15 +141,25 @@ MyGtMcpEvaluateTool >> shouldAutoIncludeVisualFor: anObject [
 ]
 
 { #category : 'private' }
+MyGtMcpEvaluateTool >> viewSelectorSuffixFor: aView [
+	| selector |
+	(aView respondsTo: #definingSelector) ifFalse: [ ^ '' ].
+	selector := [ aView definingSelector ] on: Error do: [ ^ '' ].
+	selector ifNil: [ ^ '' ].
+	^ ' [#', selector asString, ']'
+]
+
+{ #category : 'private' }
 MyGtMcpEvaluateTool >> viewSummaryFor: anObject [
 	| views |
 	views := self viewsFor: anObject.
 	^ ', ' join: (views collect: [ :view |
-		| hint |
+		| hint base |
 		hint := self viewTypeHintFor: view.
-		hint isEmpty
+		base := hint isEmpty
 			ifTrue: [ view title ]
-			ifFalse: [ view title, ' (', hint, ')' ] ])
+			ifFalse: [ view title, ' (', hint, ')' ].
+		base, (self viewSelectorSuffixFor: view) ])
 ]
 
 { #category : 'private' }
