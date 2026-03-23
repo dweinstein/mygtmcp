@@ -188,6 +188,12 @@ ClaudeMcpServer >> addAddTableSnippetTool [
 			'Added table snippet: ' , snippet uid asString ])
 ]
 
+{ #category : 'resources' }
+ClaudeMcpServer >> addAllResources [
+	self addLepiterResources.
+	self addGitResources
+]
+
 { #category : 'tools' }
 ClaudeMcpServer >> addAllTools [
 	self addSchemaToolClass: MyGtMcpGetImplementorsTool.
@@ -419,6 +425,86 @@ ClaudeMcpServer >> addGetReferencesTool [
 						method methodClass name, '>>#', method selector ]) ] ])
 ]
 
+{ #category : 'resources' }
+ClaudeMcpServer >> addGitResources [
+	self
+		addResourceNamed: 'Git repositories'
+		uri: 'gtmcp://git/repositories'
+		description: 'List the Git repositories currently loaded in the image.'
+		mimeType: 'text/plain'
+		contents: [ self resourceTextForGitRepositories ].
+	self
+		addResourceTemplateNamed: 'Git repository'
+		uriTemplate: 'gtmcp://git/repository/{name}'
+		description: 'Read summary information for one loaded Git repository.'
+		mimeType: 'text/plain'
+		contents: [ :variables | self resourceTextForGitRepositoryNamed: (variables at: 'name') ].
+	self
+		addResourceTemplateNamed: 'Git repository changes'
+		uriTemplate: 'gtmcp://git/repository/{name}/changes'
+		description: 'Read a changed-files summary for one loaded Git repository.'
+		mimeType: 'text/plain'
+		contents: [ :variables | self resourceTextForGitRepositoryChangesNamed: (variables at: 'name') ].
+	self
+		addResourceTemplateNamed: 'Git repository diff'
+		uriTemplate: 'gtmcp://git/repository/{name}/diff'
+		description: 'Read a unified textual diff for one loaded Git repository.'
+		mimeType: 'text/plain'
+		contents: [ :variables | self resourceTextForGitRepositoryDiffNamed: (variables at: 'name') ]
+]
+
+{ #category : 'resources' }
+ClaudeMcpServer >> addLepiterResources [
+	self
+		addResourceNamed: 'Lepiter databases'
+		uri: 'gtmcp://lepiter/databases'
+		description: 'List the Lepiter databases available in the current logical database.'
+		mimeType: 'text/plain'
+		contents: [ self resourceTextForLepiterDatabases ].
+	self
+		addResourceNamed: 'Lepiter pages'
+		uri: 'gtmcp://lepiter/pages'
+		description: 'List Lepiter pages across the current logical database.'
+		mimeType: 'text/plain'
+		contents: [ self resourceTextForLepiterPages ].
+	self
+		addResourceTemplateNamed: 'Lepiter database'
+		uriTemplate: 'gtmcp://lepiter/database/{databaseUuid}'
+		description: 'Read summary information for a Lepiter database by UUID.'
+		mimeType: 'text/plain'
+		contents: [ :variables | self resourceTextForLepiterDatabaseUuid: (variables at: 'databaseUuid') ].
+	self
+		addResourceTemplateNamed: 'Lepiter database pages'
+		uriTemplate: 'gtmcp://lepiter/database/{databaseUuid}/pages'
+		description: 'List pages inside one Lepiter database by UUID.'
+		mimeType: 'text/plain'
+		contents: [ :variables | self resourceTextForLepiterDatabasePagesUuid: (variables at: 'databaseUuid') ].
+	self
+		addResourceTemplateNamed: 'Lepiter database title'
+		uriTemplate: 'gtmcp://lepiter/database/{databaseUuid}/title/{title}'
+		description: 'Read a Lepiter page by exact title inside one database.'
+		mimeType: 'text/plain'
+		contents: [ :variables | self resourceTextForLepiterDatabaseUuid: (variables at: 'databaseUuid') title: (variables at: 'title') ].
+	self
+		addResourceTemplateNamed: 'Lepiter page'
+		uriTemplate: 'gtmcp://lepiter/page/{uid}'
+		description: 'Read a Lepiter page by page UUID.'
+		mimeType: 'text/plain'
+		contents: [ :variables | self resourceTextForLepiterPageUid: (variables at: 'uid') ].
+	self
+		addResourceTemplateNamed: 'Lepiter snippet'
+		uriTemplate: 'gtmcp://lepiter/snippet/{uid}'
+		description: 'Read a Lepiter snippet by snippet UID.'
+		mimeType: 'text/plain'
+		contents: [ :variables | self resourceTextForLepiterSnippetUid: (variables at: 'uid') ].
+	self
+		addResourceTemplateNamed: 'Lepiter title resolver'
+		uriTemplate: 'gtmcp://lepiter/title/{title}'
+		description: 'Resolve an exact Lepiter page title to matching page UUIDs across databases.'
+		mimeType: 'text/plain'
+		contents: [ :variables | self resourceTextForLepiterTitle: (variables at: 'title') ]
+]
+
 { #category : 'tools' }
 ClaudeMcpServer >> addListPagesTool [
 	self addTool: (GtLlmFunctionTool new
@@ -490,6 +576,32 @@ ClaudeMcpServer >> addReadSnippetTool [
 						s nextPutAll: (snippet isTextualSnippet 
 							ifTrue: [snippet string] 
 							ifFalse: ['(non-textual snippet)'])] ] ])
+]
+
+{ #category : 'resources' }
+ClaudeMcpServer >> addResourceNamed: aName uri: aUri description: aDescription mimeType: aMimeType contents: aBlock [
+	| resource |
+	resource := GtMcpResource new.
+	resource name: aName.
+	resource title: aName.
+	resource uri: aUri.
+	resource description: aDescription.
+	resource mimeType: aMimeType asZnMimeType.
+	resource contentsBlock: aBlock.
+	server addResource: resource
+]
+
+{ #category : 'resources' }
+ClaudeMcpServer >> addResourceTemplateNamed: aName uriTemplate: aUriTemplate description: aDescription mimeType: aMimeType contents: aBlock [
+	| template |
+	template := MyGtMcpResourceTemplate new.
+	template name: aName.
+	template title: aName.
+	template uriTemplate: aUriTemplate.
+	template description: aDescription.
+	template mimeType: aMimeType.
+	template contentsBlock: aBlock.
+	server addResourceTemplate: template
 ]
 
 { #category : 'tools' }
@@ -604,12 +716,56 @@ ClaudeMcpServer >> buildTableCode: colDefs rows: rowData [
 	^ stream contents
 ]
 
+{ #category : 'gt-views' }
+ClaudeMcpServer >> encodedUriSegment: aString [
+	^ ZnPercentEncoder new encode: aString
+]
+
 { #category : 'private' }
 ClaudeMcpServer >> ensureServer [
-	server ifNil: [
-		server := GtMcpServer new ].
-	server port: self port.
+	| currentPort oldServer |
+	currentPort := server ifNil: [ self port ] ifNotNil: [ server port ].
+	(server notNil and: [ server class ~= MyGtMcpServer ]) ifTrue: [
+		oldServer := server.
+		[ oldServer stop ] on: Error do: [ ].
+		server := nil ].
+	server ifNil: [ server := MyGtMcpServer new ].
+	server port: currentPort.
 	^ server
+]
+
+{ #category : 'gt-views' }
+ClaudeMcpServer >> exampleUriForTemplate: aTemplate [
+	| variables uri |
+	variables := self exampleVariablesForTemplate: aTemplate.
+	variables ifNil: [ ^ '(no example available)' ].
+	uri := aTemplate uriTemplate.
+	variables keysAndValuesDo: [ :key :value |
+		uri := uri copyReplaceAll: '{', key, '}' with: (self encodedUriSegment: value asString) ].
+	^ uri
+]
+
+{ #category : 'gt-views' }
+ClaudeMcpServer >> exampleVariablesForTemplate: aTemplate [
+	| logical database page snippet repository template |
+	template := aTemplate uriTemplate.
+	logical := self lepiterLogicalDatabase.
+	database := logical databases isEmpty ifTrue: [ nil ] ifFalse: [ logical databases anyOne ].
+	page := logical pages isEmpty ifTrue: [ nil ] ifFalse: [ logical pages anyOne ].
+	snippet := (page isNil or: [ page children size = 0 ]) ifTrue: [ nil ] ifFalse: [ page children first ].
+	repository := self gitRepositories isEmpty ifTrue: [ nil ] ifFalse: [ self gitRepositories anyOne ].
+	template = 'gtmcp://lepiter/database/{databaseUuid}' ifTrue: [ ^ database ifNil: [ nil ] ifNotNil: [ {'databaseUuid' -> database uuidString} asDictionary ] ].
+	template = 'gtmcp://lepiter/database/{databaseUuid}/pages' ifTrue: [ ^ database ifNil: [ nil ] ifNotNil: [ {'databaseUuid' -> database uuidString} asDictionary ] ].
+	template = 'gtmcp://lepiter/database/{databaseUuid}/title/{title}' ifTrue: [
+		(database isNil or: [ database pages isEmpty ]) ifTrue: [ ^ nil ].
+		^ {'databaseUuid' -> database uuidString. 'title' -> database pages anyOne title} asDictionary ].
+	template = 'gtmcp://lepiter/page/{uid}' ifTrue: [ ^ page ifNil: [ nil ] ifNotNil: [ {'uid' -> page uid asString} asDictionary ] ].
+	template = 'gtmcp://lepiter/snippet/{uid}' ifTrue: [ ^ snippet ifNil: [ nil ] ifNotNil: [ {'uid' -> snippet uid asString} asDictionary ] ].
+	template = 'gtmcp://lepiter/title/{title}' ifTrue: [ ^ page ifNil: [ nil ] ifNotNil: [ {'title' -> page title} asDictionary ] ].
+	template = 'gtmcp://git/repository/{name}' ifTrue: [ ^ repository ifNil: [ nil ] ifNotNil: [ {'name' -> repository name} asDictionary ] ].
+	template = 'gtmcp://git/repository/{name}/changes' ifTrue: [ ^ repository ifNil: [ nil ] ifNotNil: [ {'name' -> repository name} asDictionary ] ].
+	template = 'gtmcp://git/repository/{name}/diff' ifTrue: [ ^ repository ifNil: [ nil ] ifNotNil: [ {'name' -> repository name} asDictionary ] ].
+	^ nil
 ]
 
 { #category : 'private' }
@@ -642,6 +798,49 @@ ClaudeMcpServer >> exportAsBase64PngContent: anObject maxImageSize: maxDim [
 		'data' -> base64.
 		'mimeType' -> 'image/png'
 	} asDictionary
+]
+
+{ #category : 'resources-private' }
+ClaudeMcpServer >> gitChangedNodesForRepository: aRepository [
+	^ aRepository workingCopyDiff tree allChildren
+		reject: [ :each | each value class name = 'IceNoModification' ]
+]
+
+{ #category : 'resources-private' }
+ClaudeMcpServer >> gitPatchTextForNode: aNode [
+	| operation path oldText newText patch |
+	operation := aNode value.
+	path := self gitPathStringForNode: aNode.
+	oldText := [ operation rightContents ] on: Error do: [ '' ].
+	newText := [ operation leftContents ] on: Error do: [ '' ].
+	patch := DiffBuilder buildPatchFrom: oldText to: newText.
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'diff --gtmcp a/'; nextPutAll: path; nextPutAll: ' b/'; nextPutAll: path; cr.
+		stream nextPutAll: '--- a/'; nextPutAll: path; cr.
+		stream nextPutAll: '+++ b/'; nextPutAll: path; cr.
+		stream nextPutAll: patch patch ]
+]
+
+{ #category : 'resources-private' }
+ClaudeMcpServer >> gitPathStringForNode: aNode [
+	^ aNode path asString
+]
+
+{ #category : 'resources' }
+ClaudeMcpServer >> gitRepositories [
+	^ IceRepository registry asSortedCollection: [ :a :b | a name < b name ]
+]
+
+{ #category : 'resources-private' }
+ClaudeMcpServer >> gitRepositoryNamed: aName [
+	| repository |
+	repository := self gitRepositories detect: [ :each | each name = aName ] ifNone: [ nil ].
+	repository ifNil: [
+		MyGtMcpJsonRpcError
+			signalCode: -32002
+			message: 'Resource not found'
+			data: {'repositoryName' -> aName} asDictionary ].
+	^ repository
 ]
 
 { #category : 'gt-actions' }
@@ -719,6 +918,48 @@ ClaudeMcpServer >> gtOverviewFor: aView [
 			} ];
 		column: 'Property' text: [ :assoc | assoc key ];
 		column: 'Value' text: [ :assoc | assoc value ]
+]
+
+{ #category : 'gt-views' }
+ClaudeMcpServer >> gtResourcePreviewsFor: aView [
+	<gtView>
+	(self resourceItems isEmpty and: [ self resourceTemplateItems isEmpty ]) ifTrue: [ ^ aView empty ].
+	^ aView columnedList
+		title: 'Resource Previews';
+		priority: 17;
+		items: [ self resourcePreviewRows ];
+		column: 'Type' text: [ :each | each at: 'type' ] width: 80;
+		column: 'Name' text: [ :each | each at: 'name' ] weight: 0.7;
+		column: 'URI' text: [ :each | each at: 'uri' ] weight: 1.4;
+		column: 'Preview' text: [ :each | each at: 'preview' ] weight: 2.2
+]
+
+{ #category : 'gt-views' }
+ClaudeMcpServer >> gtResourceTemplatesFor: aView [
+	<gtView>
+	self resourceTemplateItems ifEmpty: [ ^ aView empty ].
+	^ aView columnedList
+		title: 'Resource Templates';
+		priority: 16;
+		items: [ self resourceTemplateItems ];
+		column: 'Name' text: [ :each | each name ] weight: 0.7;
+		column: 'URI Template' text: [ :each | each uriTemplate ] weight: 1.4;
+		column: 'Example URI' text: [ :each | self exampleUriForTemplate: each ] weight: 1.4;
+		column: 'Description' text: [ :each | each description ] weight: 1.4
+]
+
+{ #category : 'gt-views' }
+ClaudeMcpServer >> gtResourcesFor: aView [
+	<gtView>
+	self resourceItems ifEmpty: [ ^ aView empty ].
+	^ aView columnedList
+		title: 'Resources';
+		priority: 15;
+		items: [ self resourceItems ];
+		column: 'Name' text: [ :each | each name ] weight: 0.7;
+		column: 'URI' text: [ :each | each uri ] weight: 1.4;
+		column: 'Mime Type' text: [ :each | each mimeType asString ] width: 110;
+		column: 'Description' text: [ :each | each description ] weight: 1.4
 ]
 
 { #category : 'gt-actions' }
@@ -808,6 +1049,69 @@ ClaudeMcpServer >> isRunning [
 		and: [ (server instVarNamed: #server) isRunning ] ]
 ]
 
+{ #category : 'resources-private' }
+ClaudeMcpServer >> lepiterDatabaseByUuidString: aString [
+	| database |
+	database := self lepiterLogicalDatabase databases
+		detect: [ :each | each uuidString = aString ]
+		ifNone: [ nil ].
+	database ifNil: [
+		MyGtMcpJsonRpcError
+			signalCode: -32002
+			message: 'Resource not found'
+			data: {'databaseUuid' -> aString} asDictionary ].
+	^ database
+]
+
+{ #category : 'resources' }
+ClaudeMcpServer >> lepiterLogicalDatabase [
+	^ LeDatabasesRegistry default defaultLogicalDatabase
+]
+
+{ #category : 'resources-private' }
+ClaudeMcpServer >> lepiterPageByUidString: aString [
+	| uuid page |
+	[ uuid := UUID fromString: aString ]
+		on: Error
+		do: [ MyGtMcpJsonRpcError
+				signalCode: -32002
+				message: 'Resource not found'
+				data: {'pageUid' -> aString} asDictionary ].
+	self lepiterLogicalDatabase databases do: [ :database |
+		page := [ database pageByUuid: uuid ] on: Error do: [ nil ].
+		page ifNotNil: [ ^ page ] ].
+	MyGtMcpJsonRpcError
+		signalCode: -32002
+		message: 'Resource not found'
+		data: {'pageUid' -> aString} asDictionary
+]
+
+{ #category : 'resources-private' }
+ClaudeMcpServer >> lepiterPagesMatchingTitle: aTitle [
+	| matches |
+	matches := OrderedCollection new.
+	self lepiterLogicalDatabase databases do: [ :database |
+		| page |
+		page := [ database pageNamed: aTitle ] on: Error do: [ nil ].
+		page ifNotNil: [ matches add: page ] ].
+	^ matches asArray
+]
+
+{ #category : 'resources-private' }
+ClaudeMcpServer >> lepiterSnippetByUidString: aString [
+	| snippet uid |
+	uid := LeUID new uidString: aString.
+	[ snippet := self lepiterLogicalDatabase snippetWithUID: uid ]
+		on: Error
+		do: [ snippet := nil ].
+	snippet ifNil: [
+		MyGtMcpJsonRpcError
+			signalCode: -32002
+			message: 'Resource not found'
+			data: {'snippetUid' -> aString} asDictionary ].
+	^ snippet
+]
+
 { #category : 'accessing' }
 ClaudeMcpServer >> maxLength [
 	^ maxLength
@@ -855,16 +1159,48 @@ ClaudeMcpServer >> port: aPort [
 	server port: aPort
 ]
 
-{ #category : 'private' }
+{ #category : 'gt-views' }
+ClaudeMcpServer >> previewTextForTemplate: aTemplate [
+	| variables |
+	variables := self exampleVariablesForTemplate: aTemplate.
+	variables ifNil: [ ^ '(no example available)' ].
+	^ aTemplate contentsForVariables: variables
+]
+
+{ #category : 'lifecycle' }
 ClaudeMcpServer >> releaseResources [
 	server ifNotNil: [
 		[ server tools removeAll ] on: Error do: [ ].
+		[ server resources removeAll ] on: Error do: [ ].
+		[ server clearResourceTemplates ] on: Error do: [ ].
 		[ server clearHistory ] on: Error do: [ ].
 		[ server clearErrors ] on: Error do: [ ] ].
 	announcer := nil
 ]
 
-{ #category : 'actions' }
+{ #category : 'resources-private' }
+ClaudeMcpServer >> renderLepiterPage: aPage [
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Page: '; nextPutAll: aPage title; cr.
+		stream nextPutAll: 'UID: '; nextPutAll: aPage uid asString; cr.
+		stream nextPutAll: 'Database: '; nextPutAll: aPage database databaseName; cr.
+		stream nextPutAll: 'Snippets: '; nextPutAll: aPage children size asString; cr; cr.
+		aPage children withIndexDo: [ :snippet :index |
+			stream nextPutAll: index asString; nextPutAll: '. ['; nextPutAll: snippet class name; nextPutAll: ']'; cr.
+			stream nextPutAll: '   UID: '; nextPutAll: snippet uid asString; cr.
+			stream nextPutAll: '   Content: '; nextPutAll: (snippet isTextualSnippet ifTrue: [ snippet string ] ifFalse: [ '(non-textual snippet)' ]); cr; cr ] ]
+]
+
+{ #category : 'resources-private' }
+ClaudeMcpServer >> renderLepiterSnippet: aSnippet [
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Type: '; nextPutAll: aSnippet class name; cr.
+		stream nextPutAll: 'UID: '; nextPutAll: aSnippet uid asString; cr; cr.
+		stream nextPutAll: 'Content:'; cr.
+		stream nextPutAll: (aSnippet isTextualSnippet ifTrue: [ aSnippet string ] ifFalse: [ '(non-textual snippet)' ]) ]
+]
+
+{ #category : 'lifecycle' }
 ClaudeMcpServer >> reset [
 	| currentPort oldServer |
 	currentPort := self port.
@@ -872,6 +1208,8 @@ ClaudeMcpServer >> reset [
 	[ self stop ] on: Error do: [ ].
 	oldServer ifNotNil: [
 		[ oldServer tools removeAll ] on: Error do: [ ].
+		[ oldServer resources removeAll ] on: Error do: [ ].
+		[ oldServer clearResourceTemplates ] on: Error do: [ ].
 		[ oldServer clearHistory ] on: Error do: [ ].
 		[ oldServer clearErrors ] on: Error do: [ ].
 		[ oldServer stop ] on: Error do: [ ] ].
@@ -881,7 +1219,197 @@ ClaudeMcpServer >> reset [
 	self ensureServer.
 	server port: currentPort.
 	self addAllTools.
+	self addAllResources.
 	^ self
+]
+
+{ #category : 'gt-views' }
+ClaudeMcpServer >> resourceItems [
+	^ server ifNil: [ #() ] ifNotNil: [ (server instVarNamed: 'resources') items ]
+]
+
+{ #category : 'gt-views' }
+ClaudeMcpServer >> resourcePreviewRows [
+	| rows |
+	rows := OrderedCollection new.
+	self resourceItems do: [ :each |
+		rows add: {
+			'type' -> 'resource'.
+			'name' -> each name.
+			'uri' -> each uri.
+			'preview' -> (self truncatedPreviewText: [ each contents ]) } asDictionary ].
+	self resourceTemplateItems do: [ :each |
+		| exampleUri |
+		exampleUri := self exampleUriForTemplate: each.
+		rows add: {
+			'type' -> 'template'.
+			'name' -> each name.
+			'uri' -> exampleUri.
+			'preview' -> (self truncatedPreviewText: [ self previewTextForTemplate: each ]) } asDictionary ].
+	^ rows
+]
+
+{ #category : 'gt-views' }
+ClaudeMcpServer >> resourceTemplateItems [
+	^ server ifNil: [ #() ] ifNotNil: [ server resourceTemplates ]
+]
+
+{ #category : 'resources-git' }
+ClaudeMcpServer >> resourceTextForGitRepositories [
+	| repositories |
+	repositories := self gitRepositories.
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Repositories: '; nextPutAll: repositories size asString; cr; cr.
+		repositories do: [ :repository |
+			stream
+				nextPutAll: repository name;
+				nextPutAll: ' | ';
+				nextPutAll: repository branchName;
+				nextPutAll: ' | ';
+				nextPutAll: repository location pathString;
+				cr ] ]
+]
+
+{ #category : 'resources-git' }
+ClaudeMcpServer >> resourceTextForGitRepositoryChangesNamed: aName [
+	| repository changedNodes |
+	repository := self gitRepositoryNamed: aName.
+	changedNodes := self gitChangedNodesForRepository: repository.
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Changes for '; nextPutAll: repository name; cr; cr.
+		changedNodes isEmpty
+			ifTrue: [ stream nextPutAll: '(no changes)' ]
+			ifFalse: [ changedNodes do: [ :node |
+				stream
+					nextPutAll: (self gitPathStringForNode: node);
+					nextPutAll: ' | ';
+					nextPutAll: node value class name;
+					cr ] ] ]
+]
+
+{ #category : 'resources-git' }
+ClaudeMcpServer >> resourceTextForGitRepositoryDiffNamed: aName [
+	| repository changedNodes |
+	repository := self gitRepositoryNamed: aName.
+	changedNodes := self gitChangedNodesForRepository: repository.
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Diff for '; nextPutAll: repository name; cr; cr.
+		changedNodes isEmpty
+			ifTrue: [ stream nextPutAll: '(no changes)' ]
+			ifFalse: [ changedNodes do: [ :node |
+				stream nextPutAll: (self gitPatchTextForNode: node); cr; cr ] ] ]
+]
+
+{ #category : 'resources-git' }
+ClaudeMcpServer >> resourceTextForGitRepositoryNamed: aName [
+	| repository changedNodes |
+	repository := self gitRepositoryNamed: aName.
+	changedNodes := self gitChangedNodesForRepository: repository.
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Repository: '; nextPutAll: repository name; cr.
+		stream nextPutAll: 'Branch: '; nextPutAll: repository branchName; cr.
+		stream nextPutAll: 'Head: '; nextPutAll: repository headDescription; cr.
+		stream nextPutAll: 'Path: '; nextPutAll: repository location pathString; cr.
+		stream nextPutAll: 'Changed nodes: '; nextPutAll: changedNodes size asString ]
+]
+
+{ #category : 'resources-lepiter' }
+ClaudeMcpServer >> resourceTextForLepiterDatabasePagesUuid: aString [
+	| database pages |
+	database := self lepiterDatabaseByUuidString: aString.
+	pages := database pages asSortedCollection: [ :a :b | a title < b title ].
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Pages in database: '; nextPutAll: database databaseName; cr.
+		stream nextPutAll: 'Database UUID: '; nextPutAll: database uuidString; cr.
+		stream nextPutAll: 'Pages: '; nextPutAll: pages size asString; cr; cr.
+		pages do: [ :page |
+			stream nextPutAll: page uid asString; nextPutAll: ' | '; nextPutAll: page title; cr ] ]
+]
+
+{ #category : 'resources-lepiter' }
+ClaudeMcpServer >> resourceTextForLepiterDatabaseUuid: aString [
+	| database |
+	database := self lepiterDatabaseByUuidString: aString.
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Database: '; nextPutAll: database databaseName; cr.
+		stream nextPutAll: 'UUID: '; nextPutAll: database uuidString; cr.
+		stream nextPutAll: 'Pages: '; nextPutAll: database pages size asString ]
+]
+
+{ #category : 'resources-lepiter' }
+ClaudeMcpServer >> resourceTextForLepiterDatabaseUuid: aString title: aTitle [
+	| database page |
+	database := self lepiterDatabaseByUuidString: aString.
+	page := [ database pageNamed: aTitle ] on: Error do: [ nil ].
+	page ifNil: [
+		MyGtMcpJsonRpcError
+			signalCode: -32002
+			message: 'Resource not found'
+			data: {'databaseUuid' -> aString. 'title' -> aTitle} asDictionary ].
+	^ self renderLepiterPage: page
+]
+
+{ #category : 'resources-lepiter' }
+ClaudeMcpServer >> resourceTextForLepiterDatabases [
+	| databases |
+	databases := self lepiterLogicalDatabase databases asSortedCollection: [ :a :b | a databaseName < b databaseName ].
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Lepiter databases: '; nextPutAll: databases size asString; cr; cr.
+		databases do: [ :database |
+			stream
+				nextPutAll: database uuidString;
+				nextPutAll: ' | ';
+				nextPutAll: database databaseName;
+				nextPutAll: ' | pages: ';
+				nextPutAll: database pages size asString;
+				cr ] ]
+]
+
+{ #category : 'resources-lepiter' }
+ClaudeMcpServer >> resourceTextForLepiterPageUid: aString [
+	^ self renderLepiterPage: (self lepiterPageByUidString: aString)
+]
+
+{ #category : 'resources-lepiter' }
+ClaudeMcpServer >> resourceTextForLepiterPages [
+	| pages |
+	pages := self lepiterLogicalDatabase pages asSortedCollection: [ :a :b | a title < b title ].
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Pages: '; nextPutAll: pages size asString; cr; cr.
+		pages do: [ :page |
+			stream
+				nextPutAll: page uid asString;
+				nextPutAll: ' | ';
+				nextPutAll: page title;
+				nextPutAll: ' | ';
+				nextPutAll: page database databaseName;
+				cr ] ]
+]
+
+{ #category : 'resources-lepiter' }
+ClaudeMcpServer >> resourceTextForLepiterSnippetUid: aString [
+	^ self renderLepiterSnippet: (self lepiterSnippetByUidString: aString)
+]
+
+{ #category : 'resources-lepiter' }
+ClaudeMcpServer >> resourceTextForLepiterTitle: aTitle [
+	| matches |
+	matches := self lepiterPagesMatchingTitle: aTitle.
+	matches ifEmpty: [
+		MyGtMcpJsonRpcError
+			signalCode: -32002
+			message: 'Resource not found'
+			data: {'title' -> aTitle} asDictionary ].
+	^ String streamContents: [ :stream |
+		stream nextPutAll: 'Title matches for: '; nextPutAll: aTitle; cr; cr.
+		matches do: [ :page |
+			stream
+				nextPutAll: page uid asString;
+				nextPutAll: ' | ';
+				nextPutAll: page title;
+				nextPutAll: ' | ';
+				nextPutAll: page database databaseName;
+				cr ] ]
 ]
 
 { #category : 'accessing' }
@@ -889,11 +1417,15 @@ ClaudeMcpServer >> server [
 	^ server
 ]
 
-{ #category : 'actions' }
+{ #category : 'running' }
 ClaudeMcpServer >> start [
 	self ensureServer.
 	server tools removeAll.
+	server resources removeAll.
+	(server respondsTo: #clearResourceTemplates)
+		ifTrue: [ server clearResourceTemplates ].
 	self addAllTools.
+	self addAllResources.
 	server start.
 	self announcer announce: ClaudeMcpServerStarted new.
 	^ self
@@ -927,6 +1459,16 @@ ClaudeMcpServer >> truncateContentItems: contentArray [
 				item at: 'text' put: (self truncate: (item at: 'text')).
 				item ]
 			ifFalse: [ item ] ]
+]
+
+{ #category : 'gt-views' }
+ClaudeMcpServer >> truncatedPreviewText: aBlock [
+	| text |
+	text := [ aBlock value ] on: Error do: [ :error | 'Error: ', error messageText ].
+	text := text asString.
+	^ text size > 180
+		ifTrue: [ (text copyFrom: 1 to: 180), '...' ]
+		ifFalse: [ text ]
 ]
 
 { #category : 'private' }
