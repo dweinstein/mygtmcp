@@ -716,6 +716,72 @@ ClaudeMcpServer >> buildTableCode: colDefs rows: rowData [
 	^ stream contents
 ]
 
+{ #category : 'completion' }
+ClaudeMcpServer >> completionValuesForGitRepositoryName: aQuery [
+	^ self filteredCompletionValues: (self gitRepositories collect: #name) matching: aQuery
+]
+
+{ #category : 'completion' }
+ClaudeMcpServer >> completionValuesForLepiterDatabaseTitle: aQuery context: aContext [
+	| databaseUuid database titles |
+	databaseUuid := self requiredCompletionContextValueNamed: 'databaseUuid' from: aContext.
+	database := self lepiterDatabaseByUuidString: databaseUuid.
+	titles := database pages collect: #title.
+	^ self filteredCompletionValues: titles matching: aQuery
+]
+
+{ #category : 'completion' }
+ClaudeMcpServer >> completionValuesForLepiterDatabaseUuid: aQuery [
+	^ self
+		filteredCompletionValues: (self lepiterLogicalDatabase databases collect: #uuidString)
+		matching: aQuery
+]
+
+{ #category : 'completion' }
+ClaudeMcpServer >> completionValuesForLepiterPageUid: aQuery [
+	^ self
+		filteredCompletionValues: (self lepiterLogicalDatabase pages collect: [ :each | each uid asString ])
+		matching: aQuery
+]
+
+{ #category : 'completion' }
+ClaudeMcpServer >> completionValuesForLepiterSnippetUid: aQuery [
+	| values |
+	values := OrderedCollection new.
+	self lepiterLogicalDatabase snippetsDo: [ :snippet | values add: snippet uid asString ].
+	^ self filteredCompletionValues: values matching: aQuery
+]
+
+{ #category : 'completion' }
+ClaudeMcpServer >> completionValuesForLepiterTitle: aQuery [
+	^ self
+		filteredCompletionValues: (self lepiterLogicalDatabase pages collect: #title)
+		matching: aQuery
+]
+
+{ #category : 'completion' }
+ClaudeMcpServer >> completionValuesForResourceTemplateUri: aUriTemplate argument: argument context: context [
+	| argumentName query |
+	argumentName := argument at: 'name'.
+	query := argument at: 'value'.
+	aUriTemplate = 'gtmcp://lepiter/database/{databaseUuid}' ifTrue: [ ^ self completionValuesForLepiterDatabaseUuid: query ].
+	aUriTemplate = 'gtmcp://lepiter/database/{databaseUuid}/pages' ifTrue: [ ^ self completionValuesForLepiterDatabaseUuid: query ].
+	aUriTemplate = 'gtmcp://lepiter/database/{databaseUuid}/title/{title}' ifTrue: [
+		argumentName = 'databaseUuid' ifTrue: [ ^ self completionValuesForLepiterDatabaseUuid: query ].
+		argumentName = 'title' ifTrue: [ ^ self completionValuesForLepiterDatabaseTitle: query context: context ]. ].
+	aUriTemplate = 'gtmcp://lepiter/page/{uid}' ifTrue: [ ^ self completionValuesForLepiterPageUid: query ].
+	aUriTemplate = 'gtmcp://lepiter/snippet/{uid}' ifTrue: [ ^ self completionValuesForLepiterSnippetUid: query ].
+	aUriTemplate = 'gtmcp://lepiter/title/{title}' ifTrue: [ ^ self completionValuesForLepiterTitle: query ].
+	(aUriTemplate = 'gtmcp://git/repository/{name}'
+		or: [ aUriTemplate = 'gtmcp://git/repository/{name}/changes'
+		or: [ aUriTemplate = 'gtmcp://git/repository/{name}/diff' ] ]) ifTrue: [
+		^ self completionValuesForGitRepositoryName: query ].
+	MyGtMcpJsonRpcError
+		signalCode: -32602
+		message: 'Invalid params'
+		data: {'uriTemplate' -> aUriTemplate. 'argument' -> argumentName} asDictionary
+]
+
 { #category : 'gt-views' }
 ClaudeMcpServer >> encodedUriSegment: aString [
 	^ ZnPercentEncoder new encode: aString
@@ -798,6 +864,27 @@ ClaudeMcpServer >> exportAsBase64PngContent: anObject maxImageSize: maxDim [
 		'data' -> base64.
 		'mimeType' -> 'image/png'
 	} asDictionary
+]
+
+{ #category : 'completion' }
+ClaudeMcpServer >> filteredCompletionValues: aCollection matching: aQuery [
+	| query normalizedCandidates prefixMatches substringMatches ordered |
+	query := aQuery ifNil: [ '' ] ifNotNil: [ aQuery asString asLowercase ].
+	normalizedCandidates := ((aCollection collect: [ :each | each asString ]) asSet asArray)
+		asSortedCollection: [ :a :b | a asLowercase < b asLowercase ].
+	query isEmpty ifTrue: [ ^ normalizedCandidates asArray ].
+	prefixMatches := OrderedCollection new.
+	substringMatches := OrderedCollection new.
+	normalizedCandidates do: [ :each |
+		| lower |
+		lower := each asLowercase.
+		(lower beginsWith: query)
+			ifTrue: [ prefixMatches add: each ]
+			ifFalse: [ (lower includesSubstring: query) ifTrue: [ substringMatches add: each ] ] ].
+	ordered := OrderedCollection new.
+	ordered addAll: prefixMatches.
+	ordered addAll: substringMatches.
+	^ ordered asArray
 ]
 
 { #category : 'resources-private' }
@@ -1198,6 +1285,17 @@ ClaudeMcpServer >> renderLepiterSnippet: aSnippet [
 		stream nextPutAll: 'UID: '; nextPutAll: aSnippet uid asString; cr; cr.
 		stream nextPutAll: 'Content:'; cr.
 		stream nextPutAll: (aSnippet isTextualSnippet ifTrue: [ aSnippet string ] ifFalse: [ '(non-textual snippet)' ]) ]
+]
+
+{ #category : 'completion' }
+ClaudeMcpServer >> requiredCompletionContextValueNamed: aName from: aDictionary [
+	| value |
+	value := aDictionary at: aName ifAbsent: [
+		MyGtMcpJsonRpcError
+			signalCode: -32602
+			message: 'Invalid params'
+			data: {'reason' -> 'Missing required context argument'. 'name' -> aName} asDictionary ].
+	^ value asString
 ]
 
 { #category : 'lifecycle' }

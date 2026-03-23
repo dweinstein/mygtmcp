@@ -27,6 +27,14 @@ MyGtMcpServer >> clearResourceTemplates [
 ]
 
 { #category : 'private' }
+MyGtMcpServer >> completionResultValues: aCollection total: anInteger [
+	| values cappedValues |
+	values := aCollection asArray.
+	cappedValues := values size > 100 ifTrue: [ values copyFrom: 1 to: 100 ] ifFalse: [ values ].
+	^ {'completion' -> {'values' -> cappedValues. 'total' -> anInteger. 'hasMore' -> (anInteger > cappedValues size)} asDictionary} asDictionary
+]
+
+{ #category : 'private' }
 MyGtMcpServer >> cursorStartFor: aJsonRpc [
 	| cursor |
 	cursor := aJsonRpc params at: 'cursor' ifAbsent: [ nil ].
@@ -45,7 +53,29 @@ MyGtMcpServer >> getCapabilities [
 	capabilities := super getCapabilities.
 	(resources isNotEmpty or: [ resourceTemplates isNotEmpty ])
 		ifTrue: [ capabilities at: 'resources' put: Dictionary new ].
+	capabilities at: 'completions' put: Dictionary new.
 	^ capabilities
+]
+
+{ #category : 'mcp' }
+MyGtMcpServer >> handleCompletionComplete: aJsonRpc [
+	| template argument context values |
+	template := self validatedCompletionRefFrom: aJsonRpc.
+	argument := self validatedCompletionArgumentFrom: aJsonRpc forTemplate: template.
+	context := self validatedCompletionContextFrom: aJsonRpc.
+	[ values := ClaudeMcpServer default
+		completionValuesForResourceTemplateUri: template uriTemplate
+		argument: argument
+		context: context ]
+		on: Error
+		do: [ :error |
+			(error isKindOf: MyGtMcpJsonRpcError)
+				ifTrue: [ error pass ].
+			MyGtMcpJsonRpcError
+				signalCode: -32603
+				message: 'Internal error'
+				data: {'uriTemplate' -> template uriTemplate. 'argument' -> (argument at: 'name'). 'error' -> error messageText} asDictionary ].
+	^ self completionResultValues: values total: values size
 ]
 
 { #category : 'mcp' }
@@ -146,6 +176,14 @@ MyGtMcpServer >> initialize [
 ]
 
 { #category : 'private' }
+MyGtMcpServer >> invalidParams: aString data: aDictionary [
+	MyGtMcpJsonRpcError
+		signalCode: -32602
+		message: aString
+		data: aDictionary
+]
+
+{ #category : 'private' }
 MyGtMcpServer >> jsonRpcErrorResponseFor: anError id: anId [
 	| payload |
 	payload := Dictionary new.
@@ -214,6 +252,13 @@ MyGtMcpServer >> resourceNotFoundFor: aUri [
 		data: {'uri' -> aUri} asDictionary
 ]
 
+{ #category : 'private' }
+MyGtMcpServer >> resourceTemplateForUriTemplate: aString [
+	^ resourceTemplates
+		detect: [ :each | each uriTemplate = aString ]
+		ifNone: [ self invalidParams: 'Invalid params' data: {'uriTemplate' -> aString} asDictionary ]
+]
+
 { #category : 'accessing' }
 MyGtMcpServer >> resourceTemplates [
 	^ resourceTemplates
@@ -262,4 +307,47 @@ MyGtMcpServer >> validateResourceUri: aString [
 				message: 'Resource not found'
 				data: {'uri' -> aString} asDictionary ].
 	^ aString
+]
+
+{ #category : 'private' }
+MyGtMcpServer >> validatedCompletionArgumentFrom: aJsonRpc forTemplate: aTemplate [
+	| argument name value |
+	argument := aJsonRpc params at: 'argument' ifAbsent: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'Missing argument'} asDictionary ].
+	(argument isKindOf: Dictionary) ifFalse: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'argument must be an object'} asDictionary ].
+	name := argument at: 'name' ifAbsent: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'Missing argument.name'} asDictionary ].
+	(aTemplate templateVariables includes: name) ifFalse: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'Unknown argument for template'. 'name' -> name. 'uriTemplate' -> aTemplate uriTemplate} asDictionary ].
+	value := argument at: 'value' ifAbsent: [ '' ].
+	^ {'name' -> name. 'value' -> value asString} asDictionary
+]
+
+{ #category : 'private' }
+MyGtMcpServer >> validatedCompletionContextFrom: aJsonRpc [
+	| context arguments |
+	context := aJsonRpc params at: 'context' ifAbsent: [ ^ Dictionary new ].
+	(context isKindOf: Dictionary) ifFalse: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'context must be an object'} asDictionary ].
+	arguments := context at: 'arguments' ifAbsent: [ Dictionary new ].
+	(arguments isKindOf: Dictionary) ifFalse: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'context.arguments must be an object'} asDictionary ].
+	^ arguments
+]
+
+{ #category : 'private' }
+MyGtMcpServer >> validatedCompletionRefFrom: aJsonRpc [
+	| ref refType uri |
+	ref := aJsonRpc params at: 'ref' ifAbsent: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'Missing ref'} asDictionary ].
+	(ref isKindOf: Dictionary) ifFalse: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'ref must be an object'} asDictionary ].
+	refType := ref at: 'type' ifAbsent: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'Missing ref.type'} asDictionary ].
+	refType = 'ref/resource' ifFalse: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'Only ref/resource is supported'. 'type' -> refType} asDictionary ].
+	uri := ref at: 'uri' ifAbsent: [
+		self invalidParams: 'Invalid params' data: {'reason' -> 'Missing ref.uri'} asDictionary ].
+	^ self resourceTemplateForUriTemplate: uri
 ]

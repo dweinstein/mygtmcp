@@ -143,6 +143,13 @@ MyGtMcpResourceTemplate >> name: aString [
 	name := aString
 ]
 
+{ #category : 'matching' }
+MyGtMcpResourceTemplate >> templateVariables [
+	^ ((self uriSegmentsFor: self uriTemplate)
+		select: [ :each | self isTemplateVariable: each ])
+		collect: [ :each | self variableNameFromSegment: each ]
+]
+
 { #category : 'accessing' }
 MyGtMcpResourceTemplate >> title [
 	^ title ifNil: [ self name ]
