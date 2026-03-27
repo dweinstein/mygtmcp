@@ -35,40 +35,50 @@ MyGtMcpDefineClassTool class >> toolName [
 	^ 'defineClass'
 ]
 
-{ #category : 'executing' }
-MyGtMcpDefineClassTool >> executeWithArguments: arguments [
-	| superclassName className newClass traitNames composition |
+{ #category : 'api' }
+MyGtMcpDefineClassTool >> applyTraitsTo: aClass from: arguments [
+	| traitNames composition |
+	traitNames := arguments at: 'traits' ifAbsent: [ #() ].
+	traitNames ifEmpty: [ ^ self ].
+	composition := (traitNames collect: [ :each | self resolveTraitNamed: each ])
+		reduce: [ :a :b | a + b ].
+	aClass setTraitComposition: composition
+]
+
+{ #category : 'api' }
+MyGtMcpDefineClassTool >> createClassFrom: arguments [
+	| superclassName |
 	superclassName := (arguments at: 'superclassName') asSymbol.
 	(Smalltalk globals includesKey: superclassName)
-		ifFalse: [ ^ 'Superclass not found: ', superclassName ].
-	className := (arguments at: 'className').
-	newClass := (Smalltalk globals at: superclassName)
-		subclass: className asSymbol
+		ifFalse: [ self error: 'Superclass not found: ' , superclassName ].
+	^ (Smalltalk globals at: superclassName)
+		subclass: (arguments at: 'className') asSymbol
 		instanceVariableNames: (arguments at: 'instanceVariableNames' ifAbsent: [ '' ])
 		classVariableNames: ''
-		package: (arguments at: 'package').
-	traitNames := arguments at: 'traits' ifAbsent: [ #() ].
-	traitNames ifEmpty: [ ^ 'Class defined: ', className ].
-	composition := traitNames
-		inject: nil
-		into: [ :currentComposition :eachTraitName |
-			| trait |
-			trait := Smalltalk globals
-				at: eachTraitName asSymbol
-				ifAbsent: [
-					Smalltalk globals removeClassNamed: className asSymbol.
-					^ 'Trait not found: ', eachTraitName asString ].
-			(trait isTrait not)
-				ifTrue: [
-					Smalltalk globals removeClassNamed: className asSymbol.
-					^ 'Not a trait: ', eachTraitName asString ].
-			currentComposition
-				ifNil: [ trait asTraitComposition ]
-				ifNotNil: [ currentComposition + trait asTraitComposition ] ].
-	[ newClass setTraitComposition: composition ]
+		package: (arguments at: 'package')
+]
+
+{ #category : 'api' }
+MyGtMcpDefineClassTool >> executeWithArguments: arguments [
+	| className classExisted newClass |
+	className := arguments at: 'className'.
+	classExisted := Smalltalk globals includesKey: className asSymbol.
+	[ newClass := self createClassFrom: arguments.
+	self applyTraitsTo: newClass from: arguments ]
 		on: Error
 		do: [ :anError |
-			Smalltalk globals removeClassNamed: className asSymbol.
-			^ 'Failed to apply traits: ', anError messageText ].
-	^ 'Class defined: ', className
+			classExisted ifFalse: [ Smalltalk globals removeClassNamed: className asSymbol ].
+			^ anError messageText ].
+	^ 'Class defined: ' , className
+]
+
+{ #category : 'api' }
+MyGtMcpDefineClassTool >> resolveTraitNamed: aString [
+	| trait |
+	trait := Smalltalk globals
+		at: aString asSymbol
+		ifAbsent: [ self error: 'Trait not found: ' , aString ].
+	trait isTrait
+		ifFalse: [ self error: 'Not a trait: ' , aString ].
+	^ trait asTraitComposition
 ]
