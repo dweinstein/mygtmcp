@@ -45,6 +45,36 @@ MyGtMcpTool >> executeWithArguments: arguments [
 	self subclassResponsibility
 ]
 
+{ #category : 'lepiter lookup' }
+MyGtMcpTool >> findDatabaseFrom: arguments [
+	"Return the specific database if databaseId is provided, otherwise the default logical database."
+	| databaseId |
+	databaseId := arguments at: 'databaseId' ifAbsent: [ nil ].
+	databaseId ifNil: [ ^ LeDatabasesRegistry default defaultLogicalDatabase ].
+	^ LeDatabasesRegistry default defaultLogicalDatabase databases
+		detect: [ :db | db uuidString = databaseId ]
+		ifNone: [ self error: 'Database not found for ID: ' , databaseId ]
+]
+
+{ #category : 'lepiter lookup' }
+MyGtMcpTool >> findPageFrom: arguments [
+	"Look up a page by pageId (string36) or pageTitle, optionally scoped by databaseId (string36).
+	Returns the page or nil if not found."
+	| db pageId pageTitle |
+	db := self findDatabaseFrom: arguments.
+	pageId := arguments at: 'pageId' ifAbsent: [ nil ].
+	pageTitle := arguments at: 'pageTitle' ifAbsent: [ nil ].
+	(pageId isNil and: [ pageTitle isNil ])
+		ifTrue: [ self error: 'Either pageId or pageTitle must be provided' ].
+	pageId ifNotNil: [
+		| uuid |
+		uuid := UUID fromString36: pageId.
+		db pagesDo: [ :each | each uid = uuid ifTrue: [ ^ each ] ].
+		^ nil ].
+	db pagesDo: [ :each | each title = pageTitle ifTrue: [ ^ each ] ].
+	^ nil
+]
+
 { #category : 'gt-views' }
 MyGtMcpTool >> gtParametersFor: aView [
 	<gtView>

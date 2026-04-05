@@ -1,0 +1,557 @@
+{
+	"__schema" : "4.1",
+	"__type" : "page",
+	"children" : {
+		"__type" : "snippets",
+		"items" : [
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:37:49.107721-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:37:49.107721-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "kH2MF8YGQbWC6F+m/8y9Pw=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "Standardize all MCP tool parameters that reference Lepiter UUIDs (page and database) to use **string36 format** consistently, and add `pageId` / `databaseId` optional parameters to all page-referencing tools for unambiguous lookup."
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:37:57.392032-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:37:57.392032-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "9QGDQIrVTVuTsMdZIkFpHA=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "## Problem\n\n- {{gtClass:MyGtMcpReadPageTool}} only accepted `pageTitle` — no way to look up by ID. Passing `pageId` failed with \"Unknown arguments\".\n- {{gtClass:MyGtMcpAddSnippetTool}} and {{gtClass:MyGtMcpAddTableSnippetTool}} also only accept `pageTitle` — ambiguous when the same title exists in multiple databases.\n- {{gtClass:MyGtMcpListPagesTool}} outputs page UIDs in dashed UUID format (`ca2c3259-...`), but Lepiter's `pageWithID:` expects string36 (`46io0su0rvyxeisi76472568a`). Format mismatch caused lookup failures.\n- Database IDs used string36 in `gtPage` annotations (`db=`) but weren't exposed in MCP tools at all."
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:03.796984-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:03.796984-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "HP/+5LXuQkqLGUA3MWxjNQ=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "## Consistent Parameter Naming\n\nAll tools that reference Lepiter entities will use these parameter names and formats:\n\n- `pageId` (string36) — Page UUID, e.g. `46io0su0rvyxeisi76472568a`\n- `pageTitle` (string) — Page title, e.g. `\"Frida Project Notes\"`\n- `databaseId` (string36) — Database UUID, e.g. `60x6f5o0qd1whj3w3siacdymt`\n- `snippetUid` (base64 LeUID) — Snippet UID, e.g. `XkVHWo48RIagpu5LYcrnPw==` (unchanged, different entity type)"
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:07.428032-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:07.428032-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "ilLkTo6JT/y2SJAgymgY5w=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "## Implementation Steps\n\nSteps are ordered to avoid breaking running tools mid-change. If anything breaks, {{gtClass:MyGtMcpEvaluateTool}} has no Lepiter dependencies and can be used as an escape hatch to fix methods."
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:15.063604-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:15.063604-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "3ZsNyz4jTe2AynjbYxQCPg=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "### Step 1: Add shared helper — `MyGtMcpTool>>#findPageFrom:`\n\nDefine on base class {{gtClass:MyGtMcpTool}}. No tool calls it yet, so nothing breaks.\n\n**Logic:**\n1. If `databaseId` provided → find database by `uuidString =`, else use `defaultLogicalDatabase`\n2. If `pageId` provided → `UUID fromString36:`, iterate pages comparing `uid =`\n3. Else if `pageTitle` provided → `detect:` by title within scoped DB\n4. Else → error: \"Either pageId or pageTitle must be provided\"\n\n**Returns** the page or signals an error."
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:21.660998-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:21.660998-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "5LPmx3KYT0qvCYp/0Sc5og=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "### Step 2: Update `listPages` — {{gtClass:MyGtMcpListPagesTool}}\n\n**Schema changes:**\n- Add optional `databaseId` (string) — scope search to a specific database (string36)\n\n**Output format change:**\n- Page UID: `uid asString` → `uid asString36`\n- Each line becomes: `<pageId_string36> | <title> | <dbName> (<dbId_string36>)`\n\n**Why safe:** Output is consumed by LLMs as text, not parsed programmatically."
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:26.787991-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:26.787991-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "wM31kIIzTEe7JZoxAJptQg=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "### Step 3: Update `readPage` — {{gtClass:MyGtMcpReadPageTool}}\n\n**Schema changes:**\n- `pageId` (string, optional) — page UUID as string36 (was dashed UUID)\n- `pageTitle` (string, optional) — page title\n- `databaseId` (string, optional) — scope title lookup to a specific database (string36)\n- `required: []` (at least one of pageId or pageTitle must be provided)\n\n**Execute:** Use `findPageFrom:` helper. Output UID as string36, database as `name (string36)`.\n\n**Test immediately after this step** — `readPage` is the most-used Lepiter tool."
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:32.325558-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:32.325558-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "9bPO9NQbSoOVN+2XnHBg2A=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "### Step 4: Update `addSnippet` — {{gtClass:MyGtMcpAddSnippetTool}}\n\n**Schema changes:**\n- `pageTitle` (string, optional) — was required, becomes optional\n- `pageId` (string, optional) — page UUID as string36 (new)\n- `databaseId` (string, optional) — scope page lookup/creation (string36) (new)\n- `content` (string, required) — unchanged\n- `snippetType` (enum text|pharo, optional) — unchanged\n- `required: ['content']`\n\n**Execute:** Use `findPageFrom:` for existing page lookup. For page creation (when title not found and no `pageId`), if `databaseId` provided, create page in that specific database; otherwise use `defaultLogicalDatabase`."
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:37.542327-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:37.542327-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "o8lpEt54RGCaGEHBChwwAg=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "### Step 5: Update `addTableSnippet` — {{gtClass:MyGtMcpAddTableSnippetTool}}\n\n**Schema changes:**\n- `pageTitle` (string, optional) — was required, becomes optional\n- `pageId` (string, optional) — page UUID as string36 (new)\n- `databaseId` (string, optional) — scope page lookup/creation (string36) (new)\n- `columns` (string, required) — unchanged\n- `rows` (string, required) — unchanged\n- `height` (integer, optional) — unchanged\n- `required: ['columns', 'rows']`\n\n**Execute:** Same page lookup/creation pattern as `addSnippet` using `findPageFrom:`."
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:44.571942-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:44.571942-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "zr9TzyH6TWKSxPZ7zznl/g=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "### Step 6: Update `readSnippet` output — {{gtClass:MyGtMcpReadSnippetTool}}\n\n**Schema changes:** None — `snippetUid` (base64 LeUID) stays as-is. Different entity type.\n\n**Output enrichment only:**\n- Add `Page: <title>` line\n- Add `Database: <name> (<string36>)` line\n- Keep existing `Type`, `UID`, `Content` lines"
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:49.722289-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:49.722289-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "v1DnPQKASlaGI3UlE7+jZg=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "## Not Changed\n\n- {{gtClass:MyGtMcpReadSnippetTool}} input — `snippetUid` stays as base64 `LeUID` (different entity type)\n- {{gtClass:MyGtMcpUpdateSnippetTool}} — same reason\n- {{gtClass:MyGtMcpDefineClassTool}}, {{gtClass:MyGtMcpDefineMethodTool}}, {{gtClass:MyGtMcpDeleteClassTool}}, {{gtClass:MyGtMcpEvaluateTool}}, {{gtClass:MyGtMcpGetExamplesTool}}, {{gtClass:MyGtMcpGetImplementorsTool}}, {{gtClass:MyGtMcpGetMethodSourceTool}}, {{gtClass:MyGtMcpGetPackageInfoTool}}, {{gtClass:MyGtMcpGetReferencesTool}} — no Lepiter page/database references"
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:54.317532-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:38:54.317532-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "UEqhk3kUSU++eGq87pvQ+A=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "## Post-Implementation\n\n- Update `AGENTS.md` to document that MCP tools use string36 for page/database UUIDs, consistent with Lepiter's `db=` annotation format\n- Note that `listPages` output is directly copy-pasteable into `readPage`, `addSnippet`, etc.\n- Update examples showing `pageId` usage for unambiguous lookups"
+			},
+			{
+				"__type" : "textSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:45:44.80834-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:45:44.80834-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "PL6nbscgTkGTbht66BEYlw=="
+				},
+				"paragraphStyle" : {
+					"__type" : "textStyle"
+				},
+				"string" : "## Status: DONE (2026-04-05)\n\nAll 6 steps implemented and validated live. Summary of changes:\n\n**New shared helpers on {{gtClass:MyGtMcpTool}}:**\n- `findDatabaseFrom:` — resolves `databaseId` (string36) or returns default logical database\n- `findPageFrom:` — resolves page by `pageId` (string36) or `pageTitle`, scoped by optional `databaseId`. Returns page or nil.\n\n**Updated tools:**\n- {{gtMethod:MyGtMcpListPagesTool>>#executeWithArguments:}} — output uses string36 for page UIDs, includes database name + string36 ID per line. Added optional `databaseId` input to scope search.\n- {{gtMethod:MyGtMcpReadPageTool>>#executeWithArguments:}} — accepts `pageId` (string36), `pageTitle`, `databaseId`. Output UIDs in string36.\n- {{gtMethod:MyGtMcpAddSnippetTool>>#executeWithArguments:}} — accepts `pageId`, `databaseId` alongside `pageTitle`. Page creation respects `databaseId` scoping.\n- {{gtMethod:MyGtMcpAddTableSnippetTool>>#executeWithArguments:}} — same as addSnippet.\n- {{gtMethod:MyGtMcpReadSnippetTool>>#executeWithArguments:}} — output enriched with Page title and Database name + string36 ID. Input unchanged.\n\n**Unchanged:** {{gtClass:MyGtMcpUpdateSnippetTool}} (snippet UID lookup only, no page/DB reference needed)."
+			},
+			{
+				"__type" : "elementSnippet",
+				"children" : {
+					"__type" : "snippets",
+					"items" : [ ]
+				},
+				"createEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"createTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:45:50.380875-04:00"
+					}
+				},
+				"editEmail" : {
+					"__type" : "email",
+					"emailString" : "<unknown>"
+				},
+				"editTime" : {
+					"__type" : "time",
+					"time" : {
+						"__type" : "dateAndTime",
+						"dateAndTimeString" : "2026-04-05T14:45:50.380875-04:00"
+					}
+				},
+				"uid" : {
+					"__type" : "uid",
+					"uidString" : "WQWzoUoPQS2rM8R9WIrELg=="
+				},
+				"code" : "| view |\rview := GtPhlowColumnedListView new.\rview items: [ {\r  { 'Database'. 'UUID'. 'string36 (uuidString)'. 'e45rruol180fy53jra9ym9eyu' }.\r  { 'Page'. 'UUID'. 'string36 (asString36)'. 'ep8hojtniee7wuoe1y8b6i2op' }.\r  { 'Snippet'. 'LeUID'. 'base64 (uidString)'. 'kH2MF8YGQbWC6F+m/8y9Pw==' }\r} ].\rview column: 'Entity' text: [ :row | row at: 1 ] weight: 0.15.\rview column: 'Class' text: [ :row | row at: 2 ] weight: 0.15.\rview column: 'MCP Format' text: [ :row | row at: 3 ] weight: 0.2.\rview column: 'Example' text: [ :row | row at: 4 ] weight: 0.5.\rview asElement",
+				"elementHeight" : 120,
+				"codeHeight" : 50,
+				"codeVisible" : false
+			}
+		]
+	},
+	"createEmail" : {
+		"__type" : "email",
+		"emailString" : "<unknown>"
+	},
+	"createTime" : {
+		"__type" : "time",
+		"time" : {
+			"__type" : "dateAndTime",
+			"dateAndTimeString" : "2026-04-05T14:37:44.810392-04:00"
+		}
+	},
+	"editEmail" : {
+		"__type" : "email",
+		"emailString" : "<unknown>"
+	},
+	"editTime" : {
+		"__type" : "time",
+		"time" : {
+			"__type" : "dateAndTime",
+			"dateAndTimeString" : "2026-04-05T14:37:44.810392-04:00"
+		}
+	},
+	"pageType" : {
+		"__type" : "namedPage",
+		"title" : "Standardize Lepiter UUID Parameters"
+	},
+	"uid" : {
+		"__type" : "uuid",
+		"uuid" : "19b00140-617c-445a-aefb-4ea2e34651f8"
+	}
+}

@@ -5,14 +5,22 @@ Class {
 	#package : 'MyGtMcp'
 }
 
-{ #category : 'schema' }
+{ #category : 'tool definition' }
 MyGtMcpAddSnippetTool class >> inputSchema [
 	^ {
 		'type' -> 'object'.
 		'properties' -> {
 			'pageTitle' -> {
 				'type' -> 'string'.
-				'description' -> 'Lepiter page title'
+				'description' -> 'Lepiter page title (optional if pageId is provided)'
+			} asDictionary.
+			'pageId' -> {
+				'type' -> 'string'.
+				'description' -> 'Page UUID as string36 (optional if pageTitle is provided)'
+			} asDictionary.
+			'databaseId' -> {
+				'type' -> 'string'.
+				'description' -> 'Database UUID as string36 to scope page lookup/creation'
 			} asDictionary.
 			'content' -> {
 				'type' -> 'string'.
@@ -24,7 +32,7 @@ MyGtMcpAddSnippetTool class >> inputSchema [
 				'enum' -> #('text' 'pharo')
 			} asDictionary
 		} asDictionary.
-		'required' -> #('pageTitle' 'content').
+		'required' -> #('content').
 		'additionalProperties' -> false
 	} asDictionary
 ]
@@ -39,20 +47,22 @@ MyGtMcpAddSnippetTool class >> toolName [
 	^ 'addSnippet'
 ]
 
-{ #category : 'execution' }
+{ #category : 'executing' }
 MyGtMcpAddSnippetTool >> executeWithArguments: arguments [
-	| db page content snippetType snippet |
-	db := LeDatabasesRegistry default defaultLogicalDatabase.
-	page := db pageNamed: (arguments at: 'pageTitle') ifAbsent: [
-		| newPage |
-		newPage := LePage named: (arguments at: 'pageTitle').
-		db addPage: newPage.
-		newPage ].
+	| page content snippetType snippet db |
+	page := self findPageFrom: arguments.
+	page ifNil: [
+		| pageTitle |
+		pageTitle := arguments at: 'pageTitle' ifAbsent: [ nil ].
+		pageTitle ifNil: [ self error: 'Page not found for pageId: ' , (arguments at: 'pageId') ].
+		db := self findDatabaseFrom: arguments.
+		page := LePage named: pageTitle.
+		db addPage: page ].
 	content := arguments at: 'content'.
 	snippetType := arguments at: 'snippetType' ifAbsent: [ 'text' ].
 	snippet := snippetType = 'pharo'
 		ifTrue: [ LePharoSnippet code: content ]
 		ifFalse: [ LeTextSnippet string: content ].
 	page addSnippet: snippet.
-	^ 'Added snippet: ', snippet uid asString
+	^ 'Added snippet: ' , snippet uid asString
 ]

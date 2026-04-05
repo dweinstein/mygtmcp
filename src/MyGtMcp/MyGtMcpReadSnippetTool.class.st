@@ -27,7 +27,7 @@ MyGtMcpReadSnippetTool class >> toolName [
 	^ 'readSnippet'
 ]
 
-{ #category : 'execution' }
+{ #category : 'executing' }
 MyGtMcpReadSnippetTool >> executeWithArguments: arguments [
 	| db snippet uid |
 	uid := LeUID new uidString: (arguments at: 'snippetUid').
@@ -35,10 +35,15 @@ MyGtMcpReadSnippetTool >> executeWithArguments: arguments [
 	[ snippet := db snippetWithUID: uid ]
 		on: Error
 		do: [ :e | snippet := nil ].
-	snippet ifNil: [ ^ 'Snippet not found for UID: ', (arguments at: 'snippetUid') ].
+	snippet ifNil: [ ^ 'Snippet not found for UID: ' , (arguments at: 'snippetUid') ].
 	^ String streamContents: [ :stream |
 		stream nextPutAll: 'Type: '; nextPutAll: snippet class name; cr.
-		stream nextPutAll: 'UID: '; nextPutAll: snippet uid asString; cr; cr.
+		stream nextPutAll: 'UID: '; nextPutAll: snippet uid asString; cr.
+		stream nextPutAll: 'Page: '; nextPutAll: snippet page title; cr.
+		stream nextPutAll: 'Database: '; nextPutAll: snippet database databaseName;
+			nextPutAll: ' ('; nextPutAll: snippet database uuidString; nextPutAll: ')'; cr; cr.
 		stream nextPutAll: 'Content:'; cr.
-		stream nextPutAll: (snippet isTextualSnippet ifTrue: [ snippet string ] ifFalse: [ '(non-textual snippet)' ]) ]
+		stream nextPutAll: (snippet isTextualSnippet
+			ifTrue: [ snippet string ]
+			ifFalse: [ '(non-textual snippet)' ]) ]
 ]

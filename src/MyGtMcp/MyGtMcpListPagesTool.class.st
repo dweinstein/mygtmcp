@@ -5,7 +5,7 @@ Class {
 	#package : 'MyGtMcp'
 }
 
-{ #category : 'schema' }
+{ #category : 'tool definition' }
 MyGtMcpListPagesTool class >> inputSchema [
 	^ {
 		'type' -> 'object'.
@@ -13,6 +13,10 @@ MyGtMcpListPagesTool class >> inputSchema [
 			'query' -> {
 				'type' -> 'string'.
 				'description' -> 'Optional page-title substring filter'
+			} asDictionary.
+			'databaseId' -> {
+				'type' -> 'string'.
+				'description' -> 'Optional database UUID (string36) to scope search to a specific database'
 			} asDictionary
 		} asDictionary.
 		'required' -> #().
@@ -30,10 +34,10 @@ MyGtMcpListPagesTool class >> toolName [
 	^ 'listPages'
 ]
 
-{ #category : 'execution' }
+{ #category : 'executing' }
 MyGtMcpListPagesTool >> executeWithArguments: arguments [
 	| db pages query |
-	db := LeDatabasesRegistry default defaultLogicalDatabase.
+	db := self findDatabaseFrom: arguments.
 	query := arguments at: 'query' ifAbsent: [ nil ].
 	pages := db pages sorted: [ :a :b | a title < b title ].
 	(query notNil and: [ query isNotEmpty ]) ifTrue: [
@@ -42,5 +46,14 @@ MyGtMcpListPagesTool >> executeWithArguments: arguments [
 	^ String streamContents: [ :stream |
 		stream nextPutAll: 'Pages ('; nextPutAll: pages size asString; nextPutAll: ' results)'; cr; cr.
 		pages do: [ :page |
-			stream nextPutAll: page uid asString; nextPutAll: ' | '; nextPutAll: page title; cr ] ]
+			stream
+				nextPutAll: page uid asString36;
+				nextPutAll: ' | ';
+				nextPutAll: page title;
+				nextPutAll: ' | ';
+				nextPutAll: page database databaseName;
+				nextPutAll: ' (';
+				nextPutAll: page database uuidString;
+				nextPutAll: ')';
+				cr ] ]
 ]

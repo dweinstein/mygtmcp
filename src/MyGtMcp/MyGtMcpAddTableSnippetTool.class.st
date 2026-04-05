@@ -5,14 +5,22 @@ Class {
 	#package : 'MyGtMcp'
 }
 
-{ #category : 'schema' }
+{ #category : 'tool definition' }
 MyGtMcpAddTableSnippetTool class >> inputSchema [
 	^ {
 		'type' -> 'object'.
 		'properties' -> {
 			'pageTitle' -> {
 				'type' -> 'string'.
-				'description' -> 'Lepiter page title'
+				'description' -> 'Lepiter page title (optional if pageId is provided)'
+			} asDictionary.
+			'pageId' -> {
+				'type' -> 'string'.
+				'description' -> 'Page UUID as string36 (optional if pageTitle is provided)'
+			} asDictionary.
+			'databaseId' -> {
+				'type' -> 'string'.
+				'description' -> 'Database UUID as string36 to scope page lookup/creation'
 			} asDictionary.
 			'columns' -> {
 				'type' -> 'string'.
@@ -27,7 +35,7 @@ MyGtMcpAddTableSnippetTool class >> inputSchema [
 				'description' -> 'Optional element height'
 			} asDictionary
 		} asDictionary.
-		'required' -> #('pageTitle' 'columns' 'rows').
+		'required' -> #('columns' 'rows').
 		'additionalProperties' -> false
 	} asDictionary
 ]
@@ -85,23 +93,25 @@ MyGtMcpAddTableSnippetTool >> buildTableCode: colDefs rows: rowData [
 	^ stream contents
 ]
 
-{ #category : 'execution' }
+{ #category : 'executing' }
 MyGtMcpAddTableSnippetTool >> executeWithArguments: arguments [
-	| db page colDefs rowData height code snippet |
+	| page colDefs rowData height code snippet db |
 	colDefs := STONJSON fromString: (arguments at: 'columns').
 	rowData := STONJSON fromString: (arguments at: 'rows').
 	height := (arguments at: 'height' ifAbsent: [ 200 ]) asInteger.
-	db := LeDatabasesRegistry default defaultLogicalDatabase.
-	page := db pageNamed: (arguments at: 'pageTitle') ifAbsent: [
-		| newPage |
-		newPage := LePage named: (arguments at: 'pageTitle').
-		db addPage: newPage.
-		newPage ].
+	page := self findPageFrom: arguments.
+	page ifNil: [
+		| pageTitle |
+		pageTitle := arguments at: 'pageTitle' ifAbsent: [ nil ].
+		pageTitle ifNil: [ self error: 'Page not found for pageId: ' , (arguments at: 'pageId') ].
+		db := self findDatabaseFrom: arguments.
+		page := LePage named: pageTitle.
+		db addPage: page ].
 	code := self buildTableCode: colDefs rows: rowData.
 	snippet := LeElementSnippet new
 		code: code;
 		codeVisible: false;
 		elementHeight: height.
 	page addSnippet: snippet.
-	^ 'Added table snippet: ', snippet uid asString
+	^ 'Added table snippet: ' , snippet uid asString
 ]
