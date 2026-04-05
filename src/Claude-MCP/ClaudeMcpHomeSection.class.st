@@ -5,6 +5,75 @@ Class {
 	#package : 'Claude-MCP'
 }
 
+{ #category : 'helpers' }
+ClaudeMcpHomeSection >> addShowOnHoverResizersTo: anElement [
+	anElement
+		addAptitude: (BrGlamorousWithHorizontalResizerAptitude new
+			beRight;
+			resizerDo: [ :aResizer |
+				anElement addAptitude: (BrLazyStyleCommonAptitude new
+					default: [ :aStyle | aStyle do: [ :w | aResizer visibility: BlVisibility hidden ] ];
+					hovered: [ :aStyle |
+						aStyle
+							do: [ :w | aResizer visibility: BlVisibility visible ]
+							after: [ :w | aResizer visibility: BlVisibility hidden ] ]) ]);
+		addAptitude: (BrGlamorousWithVerticalResizerAptitude new
+			beBottom;
+			resizerDo: [ :aResizer |
+				anElement addAptitude: (BrLazyStyleCommonAptitude new
+					default: [ :aStyle | aStyle do: [ :w | aResizer visibility: BlVisibility hidden ] ];
+					hovered: [ :aStyle |
+						aStyle
+							do: [ :w | aResizer visibility: BlVisibility visible ]
+							after: [ :w | aResizer visibility: BlVisibility hidden ] ]) ])
+]
+
+{ #category : 'helpers' }
+ClaudeMcpHomeSection >> buildToolUsageElementFor: instance [
+	| parsed counts toolCounts theData maxCount container titleLabel |
+	container := BrVerticalPane new
+		hMatchParent;
+		vMatchParent.
+	titleLabel := BrLabel new
+		beLargeSize;
+		padding: (BlInsets bottom: 10);
+		aptitude: BrGlamorousLabelAptitude new bold;
+		text: 'Tool Usage'.
+	container addChild: titleLabel.
+	parsed := instance parsedHistory.
+	parsed ifEmpty: [
+		container addChild: (BrLabel new
+			aptitude: BrGlamorousLabelAptitude new;
+			text: 'No history yet').
+		^ container ].
+	counts := Dictionary new.
+	parsed do: [ :each |
+		| name |
+		name := each at: #toolName.
+		counts at: name put: (counts at: name ifAbsent: [ 0 ]) + 1 ].
+	toolCounts := counts associations sorted: [ :a :b | a value > b value ].
+	theData := GtPlotterDataGroup new values: toolCounts.
+	theData := theData labelled: [ :each | each key ].
+	theData := theData background: [ :each |
+		Color r: 66 g: 188 b: 238 range: 255 ].
+	maxCount := toolCounts first value.
+	container addChild: (GtPlotterHorizontalBarChart new
+		barLabelSpacing: 150;
+		barWidthScale: (GtPlotterLinearScale new domainFrom: 0 to: maxCount);
+		barWidthData: [ :each | each value ];
+		amountOfTicks: (maxCount min: 10);
+		tickLabelFormat: [ :val | val truncated asString ];
+		barElement: [ :aGtPlotterContext |
+			BlElement new
+				aptitude: ((BrGlamorousWithExplicitTooltipAptitude
+					text: aGtPlotterContext originalValue key, ': ',
+						aGtPlotterContext originalValue value asString)
+					hideDelay: 0;
+					showDelay: 0) ];
+		with: theData) asElement.
+	^ container
+]
+
 { #category : 'accessing' }
 ClaudeMcpHomeSection >> defaultPriority [
 	^ 15
@@ -15,9 +84,11 @@ ClaudeMcpHomeSection >> sectionTitle [
 	^ 'Claude MCP'
 ]
 
-{ #category : 'cards' }
+{ #category : 'api' }
 ClaudeMcpHomeSection >> serverStatusCard [
 	<gtSectionCard>
+	<gtExample>
+	<noTest>
 	| card |
 	card := GtHomeCard explicit.
 	^ card
@@ -85,14 +156,34 @@ ClaudeMcpHomeSection >> serverStatusCard [
 				addChild: statusLabel) preventMeAndChildrenMouseEvents.
 			inspectArea addChild: toolsLabel preventMeAndChildrenMouseEvents.
 			
-			container := BrVerticalPane new
-				exact: 300 @ 140;
+			container := BrVerticalPane new.
+			container
+				hExact: 300;
+				vExact: 140;
 				background: Color white;
 				aptitude: BrShadowAptitude new beLarge
 					+ (BrGlamorousButtonExteriorAptitude new 
 						backgroundPaint: Color white;
 						borderPaint: Color transparent)
 					+ (GtPhlowBrowseDefinitionAptitude new definition: [ card definingMethod ]);
+				addAptitude: (BrGlamorousWithHorizontalResizerAptitude new
+					beRight;
+					resizerDo: [ :aResizer |
+						container addAptitude: (BrLazyStyleCommonAptitude new
+							default: [ :aStyle | aStyle do: [ :w | aResizer visibility: BlVisibility hidden ] ];
+							hovered: [ :aStyle |
+								aStyle
+									do: [ :w | aResizer visibility: BlVisibility visible ]
+									after: [ :w | aResizer visibility: BlVisibility hidden ] ]) ]);
+				addAptitude: (BrGlamorousWithVerticalResizerAptitude new
+					beBottom;
+					resizerDo: [ :aResizer |
+						container addAptitude: (BrLazyStyleCommonAptitude new
+							default: [ :aStyle | aStyle do: [ :w | aResizer visibility: BlVisibility hidden ] ];
+							hovered: [ :aStyle |
+								aStyle
+									do: [ :w | aResizer visibility: BlVisibility visible ]
+									after: [ :w | aResizer visibility: BlVisibility hidden ] ]) ]);
 				padding: (BlInsets all: 15);
 				margin: (BlInsets
 					top: self spaceGap
@@ -144,4 +235,37 @@ ClaudeMcpHomeSection >> serverStatusCard [
 			updater requestUpdate.
 			
 			container ]
+]
+
+{ #category : 'api' }
+ClaudeMcpHomeSection >> toolUsageCard [
+	<gtSectionCard>
+	<gtExample>
+	<noTest>
+	| card |
+	card := GtHomeCard explicit.
+	^ card
+		title: 'MCP Tool Usage';
+		description: 'Bar chart of MCP tool call frequency';
+		priority: 2;
+		stencil: [
+			| instance element |
+			instance := ClaudeMcpServer default.
+			element := self buildToolUsageElementFor: instance.
+			element
+				background: element theme default contentBackground;
+				addAptitude: BrShadowAptitude new beLarge;
+				addAptitude: (GtPhlowBrowseDefinitionAptitude new
+					definition: [ card definingMethod ]).
+			self addShowOnHoverResizersTo: element.
+			element
+				hExact: 500;
+				vExact: 350;
+				padding: (BlInsets all: 10);
+				margin: (BlInsets
+					top: self spaceGap
+					left: 2 * self spaceGap
+					bottom: 2 * self spaceGap
+					right: 2 * self spaceGap).
+			element ]
 ]
