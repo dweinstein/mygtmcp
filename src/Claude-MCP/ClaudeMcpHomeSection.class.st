@@ -92,8 +92,8 @@ ClaudeMcpHomeSection >> serverStatusCard [
 	| card |
 	card := GtHomeCard explicit.
 	^ card
-		title: 'MCP Server for Claude';
-		description: 'Status of the MCP Server for Claude. Click to inspect.';
+		title: 'MCP Server';
+		description: 'Status of the MCP Server. Click to inspect.';
 		priority: 1;
 		stencil: [ 
 			| instance container statusDot statusLabel toolsLabel portLabel portEditor toggleButton controlRow inspectArea updater |
