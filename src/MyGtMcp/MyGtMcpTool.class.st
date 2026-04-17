@@ -37,6 +37,16 @@ MyGtMcpTool class >> on: aMcpServer [
 		yourself
 ]
 
+{ #category : 'testing' }
+MyGtMcpTool class >> shouldTruncateResult [
+	"Whether results returned by this tool should be length-capped by the MCP server's
+	maxLength (default 2000 chars). Subclasses whose output is bounded and curated
+	(e.g. a knowledge index summary) may override this to return false and opt out
+	of truncation. Leave the default true for tools that return arbitrary content
+	(evaluate, readPage, etc.) where unbounded output could flood the transport."
+	^ true
+]
+
 { #category : 'accessing' }
 MyGtMcpTool class >> toolDescription [
 	self subclassResponsibility
@@ -228,8 +238,13 @@ MyGtMcpTool >> truncateContentItems: contentArray [
 			ifFalse: [ item ] ]
 ]
 
-{ #category : 'private' }
+{ #category : 'executing' }
 MyGtMcpTool >> truncateResult: result [
+	"Apply maxLength truncation unless the tool's class has opted out.
+	Content-item arrays get per-item text truncation; plain results go through
+	the server's global truncate:. When truncation is disabled, the result is
+	passed through unchanged (String or array-of-dicts)."
+	self class shouldTruncateResult ifFalse: [ ^ result ].
 	(result isArray and: [ result allSatisfy: #isDictionary ])
 		ifTrue: [ ^ self truncateContentItems: result ].
 	^ self mcpServer truncate: result asString
