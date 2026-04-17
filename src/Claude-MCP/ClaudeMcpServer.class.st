@@ -134,6 +134,15 @@ ClaudeMcpServer class >> startOnPort: aPort [
 	^ instance
 ]
 
+{ #category : 'tools' }
+ClaudeMcpServer >> addAllExtensionTools [
+	"Register every MyGtMcpTool subclass that opts in via isMcpExtensionTool.
+	Called from addAllTools after the built-in tools are registered.
+	Lets extension packages add tools without modifying the MyGtMcp or Claude-MCP core."
+	MyGtMcpTool allMcpExtensionToolClasses do: [ :toolClass |
+		self addSchemaToolClass: toolClass ]
+]
+
 { #category : 'resources' }
 ClaudeMcpServer >> addAllResources [
 	self addLepiterResources.
@@ -156,7 +165,8 @@ ClaudeMcpServer >> addAllTools [
 	self addSchemaToolClass: MyGtMcpUpdateSnippetTool.
 	self addSchemaToolClass: MyGtMcpAddSnippetTool.
 	self addSchemaToolClass: MyGtMcpGetReferencesTool.
-	self addSchemaToolClass: MyGtMcpAddTableSnippetTool
+	self addSchemaToolClass: MyGtMcpAddTableSnippetTool.
+	self addAllExtensionTools
 ]
 
 { #category : 'resources' }

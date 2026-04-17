@@ -8,9 +8,26 @@ Class {
 	#package : 'MyGtMcp'
 }
 
+{ #category : 'extension' }
+MyGtMcpTool class >> allMcpExtensionToolClasses [
+	"Return every MyGtMcpTool subclass that opts in to auto-registration via
+	isMcpExtensionTool. Classes are sorted by name for deterministic ordering."
+	^ (self allSubclasses select: [ :each | each isMcpExtensionTool ])
+		sort: [ :a :b | a name < b name ]
+]
+
 { #category : 'schema' }
 MyGtMcpTool class >> inputSchema [
 	self subclassResponsibility
+]
+
+{ #category : 'extension' }
+MyGtMcpTool class >> isMcpExtensionTool [
+	"Subclasses defined in separate extension packages should override this to return true.
+	When ClaudeMcpServer>>#addAllExtensionTools runs, every subclass answering true here is
+	auto-registered on top of the built-in tools. Default is false so the base class and
+	the built-in tools (registered explicitly in addAllTools) are not double-registered."
+	^ false
 ]
 
 { #category : 'instance creation' }
