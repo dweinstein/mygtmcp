@@ -172,6 +172,7 @@ ClaudeMcpServer >> addAllTools [
 	self addSchemaToolClass: MyGtMcpAddSnippetTool.
 	self addSchemaToolClass: MyGtMcpGetReferencesTool.
 	self addSchemaToolClass: MyGtMcpAddTableSnippetTool.
+	self addSchemaToolClass: MyGtMcpCommitRepositoryTool.
 	self addAllExtensionTools
 ]
 
