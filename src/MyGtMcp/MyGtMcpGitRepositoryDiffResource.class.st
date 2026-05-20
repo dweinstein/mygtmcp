@@ -27,17 +27,21 @@ MyGtMcpGitRepositoryDiffResource >> completionValuesForArgument: argument contex
 	^ nil
 ]
 
-{ #category : 'contents' }
+{ #category : 'accessing' }
 MyGtMcpGitRepositoryDiffResource >> contentsForVariables: aDictionary [
-	| repository changedNodes |
+	| repository changedNodes lepiterPatches |
 	repository := MyGtMcpGitLookup repositoryNamed: (aDictionary at: 'name').
 	changedNodes := MyGtMcpGitLookup changedNodesForRepository: repository.
+	lepiterPatches := MyGtMcpGitLookup lepiterPatchTextsForRepository: repository.
 	^ String streamContents: [ :stream |
 		stream nextPutAll: 'Diff for '; nextPutAll: repository name; lf; lf.
-		changedNodes isEmpty
+		(changedNodes isEmpty and: [ lepiterPatches isEmpty ])
 			ifTrue: [ stream nextPutAll: '(no changes)' ]
-			ifFalse: [ changedNodes do: [ :node |
-				stream nextPutAll: (self patchTextForNode: node); lf; lf ] ] ]
+			ifFalse: [
+				changedNodes do: [ :node |
+					stream nextPutAll: (self patchTextForNode: node); lf; lf ].
+				lepiterPatches do: [ :patch |
+					stream nextPutAll: patch; lf; lf ] ] ]
 ]
 
 { #category : 'preview' }

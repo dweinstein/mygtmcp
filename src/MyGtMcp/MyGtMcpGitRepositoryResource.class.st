@@ -27,17 +27,21 @@ MyGtMcpGitRepositoryResource >> completionValuesForArgument: argument context: c
 	^ nil
 ]
 
-{ #category : 'contents' }
+{ #category : 'accessing' }
 MyGtMcpGitRepositoryResource >> contentsForVariables: aDictionary [
-	| repository changedNodes |
+	| repository packageChanges lepiterChanges totalChanges |
 	repository := MyGtMcpGitLookup repositoryNamed: (aDictionary at: 'name').
-	changedNodes := MyGtMcpGitLookup changedNodesForRepository: repository.
+	packageChanges := MyGtMcpGitLookup changedNodesForRepository: repository.
+	lepiterChanges := MyGtMcpGitLookup lepiterDeltasForRepository: repository.
+	totalChanges := packageChanges size + lepiterChanges size.
 	^ String streamContents: [ :stream |
 		stream nextPutAll: 'Repository: '; nextPutAll: repository name; lf.
 		stream nextPutAll: 'Branch: '; nextPutAll: repository branchName; lf.
 		stream nextPutAll: 'Head: '; nextPutAll: repository headDescription; lf.
 		stream nextPutAll: 'Path: '; nextPutAll: repository location pathString; lf.
-		stream nextPutAll: 'Changed nodes: '; nextPutAll: changedNodes size asString ]
+		stream nextPutAll: 'Changed nodes: '; nextPutAll: totalChanges asString; lf.
+		stream nextPutAll: 'Package changes: '; nextPutAll: packageChanges size asString; lf.
+		stream nextPutAll: 'Lepiter changes: '; nextPutAll: lepiterChanges size asString ]
 ]
 
 { #category : 'preview' }

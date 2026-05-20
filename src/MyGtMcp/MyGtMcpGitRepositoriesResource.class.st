@@ -20,7 +20,7 @@ MyGtMcpGitRepositoriesResource class >> uriTemplate [
 	^ 'gtmcp://git/repositories'
 ]
 
-{ #category : 'contents' }
+{ #category : 'accessing' }
 MyGtMcpGitRepositoriesResource >> contentsForVariables: aDictionary [
 	| repositories |
 	repositories := MyGtMcpGitLookup repositories.
@@ -31,6 +31,8 @@ MyGtMcpGitRepositoriesResource >> contentsForVariables: aDictionary [
 				nextPutAll: repository name;
 				nextPutAll: ' | ';
 				nextPutAll: repository branchName;
+				nextPutAll: ' | changes: ';
+				nextPutAll: (MyGtMcpGitLookup changeCountForRepository: repository) asString;
 				nextPutAll: ' | ';
 				nextPutAll: repository location pathString;
 				lf ] ]

@@ -27,21 +27,16 @@ MyGtMcpGitRepositoryChangesResource >> completionValuesForArgument: argument con
 	^ nil
 ]
 
-{ #category : 'contents' }
+{ #category : 'accessing' }
 MyGtMcpGitRepositoryChangesResource >> contentsForVariables: aDictionary [
-	| repository changedNodes |
+	| repository lines |
 	repository := MyGtMcpGitLookup repositoryNamed: (aDictionary at: 'name').
-	changedNodes := MyGtMcpGitLookup changedNodesForRepository: repository.
+	lines := MyGtMcpGitLookup changeSummaryLinesForRepository: repository.
 	^ String streamContents: [ :stream |
 		stream nextPutAll: 'Changes for '; nextPutAll: repository name; lf; lf.
-		changedNodes isEmpty
+		lines isEmpty
 			ifTrue: [ stream nextPutAll: '(no changes)' ]
-			ifFalse: [ changedNodes do: [ :node |
-				stream
-					nextPutAll: node path asString;
-					nextPutAll: ' | ';
-					nextPutAll: node value class name;
-					lf ] ] ]
+			ifFalse: [ lines do: [ :line | stream nextPutAll: line; lf ] ] ]
 ]
 
 { #category : 'preview' }
