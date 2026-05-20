@@ -39,19 +39,29 @@ MyGtMcpCommitRepositoryTool class >> toolName [
 	^ 'commitRepository'
 ]
 
-{ #category : 'committing' }
-MyGtMcpCommitRepositoryTool >> commitLepiterChangesForRepository: repository message: message [
-	| lepiterChanges index |
-	lepiterChanges := MyGtMcpGitLookup lepiterDeltasForRepository: repository.
-	lepiterChanges isEmpty ifTrue: [ ^ nil ].
+{ #category : 'execution' }
+MyGtMcpCommitRepositoryTool >> commitAllChangesForRepository: repository message: message [
+	| diff index parentCommits newCommit |
+	repository workingCopy validateCanCommit.
+	diff := repository workingCopyDiff.
 	index := repository index.
-	index addPath: (RelativePath withAll: #('lepiter')).
-	^ index commitWithMessage: message andParents: { repository head commit }
+	diff tree allChildren isEmpty ifFalse: [
+		index
+			updateDiskWorkingCopy: diff;
+			updateIndex: diff ].
+	self stageLepiterChangesForRepository: repository index: index.
+	index isEmpty ifTrue: [ IceNothingToCommit signal ].
+	parentCommits := repository workingCopy workingCopyState referenceCommits
+		reject: [ :each | each isNoCommit ].
+	newCommit := repository commitIndexWithMessage: message andParents: parentCommits.
+	repository workingCopy referenceCommit: newCommit.
+	repository workingCopy refreshDirtyPackages.
+	^ newCommit
 ]
 
 { #category : 'execution' }
 MyGtMcpCommitRepositoryTool >> executeWithArguments: arguments [
-	| name message confirm repository packageChanges lepiterChanges totalChanges firstLine commitCount |
+	| name message confirm repository packageChanges lepiterChanges totalChanges firstLine commit |
 	name := (arguments at: 'name') asString.
 	message := (arguments at: 'message') asString.
 	message trimmed isEmpty ifTrue: [
@@ -78,14 +88,10 @@ MyGtMcpCommitRepositoryTool >> executeWithArguments: arguments [
 			stream nextPutAll: 'Or read gtmcp://git/repository/'; nextPutAll: repository name;
 				nextPutAll: '/changes for per-file summary.' ] ].
 	totalChanges = 0 ifTrue: [ ^ self noChangesResponseForRepository: repository ].
-	commitCount := 0.
-	[ packageChanges isEmpty ifFalse: [
-		[ repository workingCopy commitWithMessage: message.
-		commitCount := commitCount + 1 ]
+	[
+		[ commit := self commitAllChangesForRepository: repository message: message ]
 			on: IceNothingToCommit
-			do: [ :ignored | nil ] ].
-	(self commitLepiterChangesForRepository: repository message: message)
-		ifNotNil: [ :commit | commitCount := commitCount + 1 ] ]
+			do: [ :ignored | ^ self noChangesResponseForRepository: repository ] ]
 		on: IceError
 		do: [ :anError |
 			MyGtMcpJsonRpcError
@@ -94,7 +100,6 @@ MyGtMcpCommitRepositoryTool >> executeWithArguments: arguments [
 				data: {
 					'repository' -> repository name.
 					'error' -> anError messageText } asDictionary ].
-	commitCount = 0 ifTrue: [ ^ self noChangesResponseForRepository: repository ].
 	^ String streamContents: [ :stream |
 		stream nextPutAll: 'Committed '; nextPutAll: (self shortHeadForRepository: repository); lf.
 		stream nextPutAll: '  '; nextPutAll: firstLine; lf.
@@ -102,7 +107,7 @@ MyGtMcpCommitRepositoryTool >> executeWithArguments: arguments [
 			nextPutAll: ' changes (packages: '; nextPutAll: packageChanges size asString;
 			nextPutAll: ', lepiter: '; nextPutAll: lepiterChanges size asString;
 			nextPutAll: ')'; lf.
-		stream nextPutAll: '  Commits: '; nextPutAll: commitCount asString ]
+		stream nextPutAll: '  Commits: 1' ]
 ]
 
 { #category : 'formatting' }
@@ -120,4 +125,10 @@ MyGtMcpCommitRepositoryTool >> noChangesResponseForRepository: repository [
 { #category : 'formatting' }
 MyGtMcpCommitRepositoryTool >> shortHeadForRepository: repository [
 	^ repository head commit id first: (8 min: repository head commit id size)
+]
+
+{ #category : 'execution' }
+MyGtMcpCommitRepositoryTool >> stageLepiterChangesForRepository: repository index: index [
+	(MyGtMcpGitLookup lepiterDeltasForRepository: repository) isEmpty ifTrue: [ ^ self ].
+	index addPath: (RelativePath withAll: #('lepiter'))
 ]
