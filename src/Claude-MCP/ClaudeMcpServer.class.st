@@ -452,28 +452,14 @@ ClaudeMcpServer >> gtInspectServerActionFor: anAction [
 		action: [ :aButton | aButton phlow spawnObject: server ]
 ]
 
-{ #category : 'gt-views' }
+{ #category : 'views' }
 ClaudeMcpServer >> gtLiveLogFor: aView [
 	<gtView>
-	^ aView columnedList
+	^ aView forward
 		title: 'Live log';
 		priority: 4;
-		items: [ self parsedHistory reversed ];
-		column: '#' text: [ :each :idx | idx ] width: 40;
-		column: 'Tool' text: [ :each | each at: #toolName ] width: 130;
-		column: 'Arguments' text: [ :each |
-			| args |
-			args := each at: #arguments.
-			args isDictionary
-				ifTrue: [ 
-					(', ' join: (args associations collect: [ :a |
-						a key, ': ', (a value asString truncateTo: 40) ])) truncateTo: 120 ]
-				ifFalse: [ args asString truncateTo: 120 ] ];
-		column: 'Error' text: [ :each |
-			(each at: #isError)
-				ifTrue: [ 'Yes' ]
-				ifFalse: [ '' ] ] width: 50;
-		actionUpdateButton
+		object: [ self liveLogEntries ];
+		view: #gtEntriesFor:
 ]
 
 { #category : 'gt-views' }
@@ -624,6 +610,22 @@ ClaudeMcpServer >> isRunning [
 	^ server notNil
 		and: [ (server instVarNamed: #server) notNil
 		and: [ (server instVarNamed: #server) isRunning ] ]
+]
+
+{ #category : 'history' }
+ClaudeMcpServer >> liveLogEntries [
+	^ (ClaudeMcpToolCallLogEntryGroup withAll: self liveLogEntryItems)
+		server: self;
+		yourself
+]
+
+{ #category : 'history' }
+ClaudeMcpServer >> liveLogEntryItems [
+	| index |
+	index := 0.
+	^ self parsedHistory reversed collect: [ :each |
+		index := index + 1.
+		ClaudeMcpToolCallLogEntry index: index dictionary: each ]
 ]
 
 { #category : 'accessing' }
