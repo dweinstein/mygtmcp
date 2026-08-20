@@ -8,11 +8,14 @@ Class {
 	#package : 'Claude-MCP'
 }
 
-{ #category : 'private' }
+{ #category : 'handlers' }
 MyGtMcpServer >> acceptedNotificationResponse [
+	"Without a Content-Length the client waits for the body until its timeout."
 	| notificationResponse |
 	notificationResponse := ZnResponse new.
 	notificationResponse statusLine: (ZnStatusLine code: 202).
+	notificationResponse headers: ZnHeaders defaultResponseHeaders.
+	notificationResponse entity: (ZnEntity text: '').
 	^ notificationResponse
 ]
 
@@ -34,10 +37,11 @@ MyGtMcpServer >> completionResultValues: aCollection total: anInteger [
 	^ {'completion' -> {'values' -> cappedValues. 'total' -> anInteger. 'hasMore' -> (anInteger > cappedValues size)} asDictionary} asDictionary
 ]
 
-{ #category : 'private' }
+{ #category : 'handlers' }
 MyGtMcpServer >> cursorStartFor: aJsonRpc [
+	"Parameterless requests arrive without a params object at all."
 	| cursor |
-	cursor := aJsonRpc params at: 'cursor' ifAbsent: [ nil ].
+	cursor := aJsonRpc params ifNil: [ nil ] ifNotNil: [ :p | p at: 'cursor' ifAbsent: [ nil ] ].
 	cursor ifNil: [ ^ 1 ].
 	^ [ cursor asInteger ] on: Error do: [ 1 ]
 ]
@@ -45,6 +49,20 @@ MyGtMcpServer >> cursorStartFor: aJsonRpc [
 { #category : 'private' }
 MyGtMcpServer >> defaultListPageSize [
 	^ 100
+]
+
+{ #category : 'handlers' }
+MyGtMcpServer >> dispatch: aJsonRpc [
+	"Unknown methods answer JSON-RPC -32601 so clients treat the capability as absent."
+	| selector |
+	selector := (#handle
+		, ((aJsonRpc method replaceAllRegex: '[^a-zA-Z]' with: ' ') asCamelCase asSymbol asMutator)) asSymbol.
+	(self respondsTo: selector) ifFalse: [
+		MyGtMcpJsonRpcError
+			signalCode: -32601
+			message: 'Method not found: ' , aJsonRpc method
+			data: nil ].
+	^ self perform: selector withArguments: { aJsonRpc }
 ]
 
 { #category : 'mcp' }
@@ -76,6 +94,29 @@ MyGtMcpServer >> handleCompletionComplete: aJsonRpc [
 				message: 'Internal error'
 				data: {'uriTemplate' -> template uriTemplate. 'argument' -> (argument at: 'name'). 'error' -> error messageText} asDictionary ].
 	^ self completionResultValues: values total: values size
+]
+
+{ #category : 'handlers' }
+MyGtMcpServer >> handleInitialize: aJsonRpc [
+	"I answer only a protocol version I actually implement."
+	| requested version |
+	requested := aJsonRpc params at: 'protocolVersion' ifAbsent: [ '2025-03-26' ].
+	version := (#('2025-03-26' '2025-06-18') includes: requested)
+		ifTrue: [ requested ]
+		ifFalse: [ '2025-06-18' ].
+	^ {'protocolVersion' -> version.
+		'capabilities' -> self getCapabilities.
+		'serverInfo'
+			-> {'name' -> 'Glamorous Toolkit'.
+					'title' -> 'Glamorous Toolkit MCP Server'.
+					'version' -> '1.0.0'} asDictionary.
+		'instructions' -> ''} asDictionary
+]
+
+{ #category : 'handlers' }
+MyGtMcpServer >> handlePing: aJsonRpc [
+	"Clients health-check with ping and expect an empty result."
+	^ Dictionary new
 ]
 
 { #category : 'mcp' }
