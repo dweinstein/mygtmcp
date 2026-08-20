@@ -47,6 +47,20 @@ MyGtMcpServer >> defaultListPageSize [
 	^ 100
 ]
 
+{ #category : 'handlers' }
+MyGtMcpServer >> dispatch: aJsonRpc [
+	"Unknown methods answer JSON-RPC -32601 so clients treat the capability as absent."
+	| selector |
+	selector := (#handle
+		, ((aJsonRpc method replaceAllRegex: '[^a-zA-Z]' with: ' ') asCamelCase asSymbol asMutator)) asSymbol.
+	(self respondsTo: selector) ifFalse: [
+		MyGtMcpJsonRpcError
+			signalCode: -32601
+			message: 'Method not found: ' , aJsonRpc method
+			data: nil ].
+	^ self perform: selector withArguments: { aJsonRpc }
+]
+
 { #category : 'mcp' }
 MyGtMcpServer >> getCapabilities [
 	| capabilities |
