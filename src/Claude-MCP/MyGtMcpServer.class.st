@@ -78,6 +78,12 @@ MyGtMcpServer >> handleCompletionComplete: aJsonRpc [
 	^ self completionResultValues: values total: values size
 ]
 
+{ #category : 'handlers' }
+MyGtMcpServer >> handlePing: aJsonRpc [
+	"Clients health-check with ping and expect an empty result."
+	^ Dictionary new
+]
+
 { #category : 'mcp' }
 MyGtMcpServer >> handleRequest: request [
         | jsonRpc response jsonRpcResult |
